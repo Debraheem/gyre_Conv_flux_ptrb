@@ -23,11 +23,8 @@ module tnad_bvp_m
 
    use forum_m, only: RD
 
-   use bound_m
    use bvp_m
    use context_m
-   use diff_element_m
-   use ext_m
    use grid_m
    use model_m
    use mode_par_m
@@ -89,8 +86,9 @@ contains
 
    function tnad_bvp_t_(cx, gr, md_p, nm_p, os_p) result(bp)
 
+      use bound_conds_m
+      use nad_factory_m
       use tnad_factory_m
-      use tnad_diff_m
 
       class(context_t), pointer, intent(in) :: cx
       type(grid_t), intent(in)              :: gr
@@ -99,31 +97,19 @@ contains
       type(osc_par_t), intent(in)           :: os_p
       type(tnad_bvp_t)                      :: bp
 
-      class(bound_ct), allocatable       :: bd_i
-      class(bound_ct), allocatable       :: bd_o
-      integer                            :: j
-      type(diff_element_ct), allocatable :: de(:)
+      class(bound_conds_ct), allocatable :: bc_i
+      class(bound_conds_ct), allocatable :: bc_o
       class(model_t), pointer            :: ml
+      integer                            :: j
 
-      ! Construct the tnad_bvp_t
+      ! Construct the tnad_bvp type
 
-      ! Initialize the boundary conditions
+      ! Initialize the base type
 
-      bd_i = tnad_ibound_t(cx, os_p)
-      bd_o = tnad_obound_t(cx, os_p)
+      bc_i = nad_ibound_conds_t(cx, os_p)
+      bc_o = nad_obound_conds_t(cx, os_p)
 
-      ! Initialize the difference equations
-
-      allocate(de(gr%n-1))
-
-      !$OMP PARALLEL DO
-      do j = 1, gr%n-1
-         allocate(de(j)%df, SOURCE=tnad_diff_t(cx, gr%pt(j), gr%pt(j+1), nm_p, os_p))
-      end do
-
-      ! Initialize the bvp_t
-
-      bp%bvp_ct = bvp_ct(bd_i, bd_o, de, nm_p)
+      bp%bvp_ct = bvp_ct(gr, bc_i, bc_o, diff_eqns_factory_, match_conds_factory_, nm_p)
 
       ! Other initializations
 
@@ -174,6 +160,52 @@ contains
       ! Finish
 
       return
+
+   contains
+
+      subroutine diff_eqns_factory_(pt, de)
+
+         use diff_eqns_m
+
+         type(point_t), intent(in)                     :: pt(:)
+         class(diff_eqns_ct), allocatable, intent(out) :: de(:)
+
+         ! Initialize the differential equations
+
+         #:if defined('GFORTRAN_PR125610')
+         de = tnad_diff_eqns_t_1_(cx, pt, os_p)
+         #:else
+         de = tnad_tnad_eqns_t(cx, pt, os_p)
+         #:endif
+
+         ! Finish
+
+         return
+
+      end subroutine diff_eqns_factory_
+
+      !****
+
+      subroutine match_conds_factory_(pt, mc)
+
+         use match_conds_m
+
+         type(point_t), intent(in)                       :: pt(:)
+         class(match_conds_ct), allocatable, intent(out) :: mc(:)
+
+         ! Initialize the match conditions
+
+         #:if defined('GFORTRAN_PR125610')
+         mc = nad_match_conds_t_1_(cx, pt, os_p)
+         #:else
+         mc = nad_match_conds_t(cx, pt, os_p)
+         #:endif
+
+         ! Finish
+
+         return
+
+      end subroutine match_conds_factory_
 
    end function tnad_bvp_t_
 

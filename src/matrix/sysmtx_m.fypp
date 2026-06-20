@@ -1,5 +1,5 @@
 ! Module  : sysmtx_m
-! Purpose : system matrix
+! Purpose : system of linear equations representing a discretized BVP
 !
 ! Copyright 2013-2026 Rich Townsend & The GYRE Team
 !
@@ -28,10 +28,10 @@ module sysmtx_m
       ! Derived-type definitions
 
       type, abstract :: sysmtx_${S}$
-         integer :: n    ! Number of equation blocks
-         integer :: n_e  ! Number of equations per block
-         integer :: n_i  ! Number of inner boundary conditions
-         integer :: n_o  ! Number of outer boundary conditions
+         integer :: n    ! Number of internal blocks
+         integer :: n_e  ! Number of equations in internal blocks
+         integer :: n_i  ! Number of equations in inner block
+         integer :: n_o  ! Number of equations in outer block
       contains
          procedure(eval_det_${S}$_), deferred    :: eval_det
          procedure(solve_hom_${S}$_), deferred   :: solve_hom
@@ -43,52 +43,55 @@ module sysmtx_m
 
       abstract interface
 
-         subroutine eval_det_${S}$_(this, st, bd_i, bd_o, de, det)
+         subroutine eval_det_${S}$_(this, st, bb_i, bb_o, ie, det)
             use forum_m, only: RD
-            use state_m
-            use bound_m
-            use diff_element_m
+            use bound_block_m
             use ext_m
+            use inter_block_m
+            use inter_element_m
+            use state_m
             import sysmtx_${S}$
             implicit none (type, external)
-            class(sysmtx_${S}$), intent(inout)    :: this
-            class(state_${S}$), intent(in)        :: st
-            class(bound_${S}$), intent(in)        :: bd_i
-            class(bound_${S}$), intent(in)        :: bd_o
-            class(diff_element_${S}$), intent(in) :: de(:)
-            type(ext_${S}$), intent(out)          :: det
+            class(sysmtx_${S}$), intent(inout)     :: this
+            class(state_${S}$), intent(in)         :: st
+            class(bound_block_${S}$), intent(in)   :: bb_i
+            class(bound_block_${S}$), intent(in)   :: bb_o
+            class(inter_element_${S}$), intent(in) :: ie(:)
+            type(ext_${S}$), intent(out)           :: det
          end subroutine eval_det_${S}$_
 
-         subroutine solve_hom_${S}$_(this, st, bd_i, bd_o, de, u)
+         subroutine solve_hom_${S}$_(this, st, bb_i, bb_o, ie, u)
             use forum_m, only: RD
-            use state_m
-            use bound_m
-            use diff_element_m
+            use bound_block_m
             use ext_m
+            use inter_block_m
+            use inter_element_m
+            use state_m
             import sysmtx_${S}$
             implicit none (type, external)
-            class(sysmtx_${S}$), intent(inout)    :: this
-            class(state_${S}$), intent(in)        :: st
-            class(bound_${S}$), intent(in)        :: bd_i
-            class(bound_${S}$), intent(in)        :: bd_o
-            class(diff_element_${S}$), intent(in) :: de(:)
-            ${T}$, intent(out)                    :: u(:)
+            class(sysmtx_${S}$), intent(inout)     :: this
+            class(state_${S}$), intent(in)         :: st
+            class(bound_block_${S}$), intent(in)   :: bb_i
+            class(bound_block_${S}$), intent(in)   :: bb_o
+            class(inter_element_${S}$), intent(in) :: ie(:)
+            ${T}$, intent(out)                     :: u(:)
          end subroutine solve_hom_${S}$_
 
-         subroutine solve_inhom_${S}$_(this, st, bd_i, bd_o, de, u)
+         subroutine solve_inhom_${S}$_(this, st, bb_i, bb_o, ie, u)
             use forum_m, only: RD
-            use state_m
-            use bound_m
-            use diff_element_m
+            use bound_block_m
             use ext_m
+            use inter_block_m
+            use inter_element_m
+            use state_m
             import sysmtx_${S}$
             implicit none (type, external)
-            class(sysmtx_${S}$), intent(inout)    :: this
-            class(state_${S}$), intent(in)        :: st
-            class(bound_${S}$), intent(in)        :: bd_i
-            class(bound_${S}$), intent(in)        :: bd_o
-            class(diff_element_${S}$), intent(in) :: de(:)
-            ${T}$, intent(out)                    :: u(:)
+            class(sysmtx_${S}$), intent(inout)     :: this
+            class(state_${S}$), intent(in)         :: st
+            class(bound_block_${S}$), intent(in)   :: bb_i
+            class(bound_block_${S}$), intent(in)   :: bb_o
+            class(inter_element_${S}$), intent(in) :: ie(:)
+            ${T}$, intent(out)                     :: u(:)
          end subroutine solve_inhom_${S}$_
 
          subroutine dump_${S}$_(this, hi)

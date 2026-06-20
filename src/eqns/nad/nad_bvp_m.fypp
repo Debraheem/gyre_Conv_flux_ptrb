@@ -23,16 +23,17 @@ module nad_bvp_m
 
    use forum_m, only: RD
 
-   use bound_m
    use bvp_m
    use context_m
-   use diff_element_m
+   use diff_eqns_m
+   use ext_m
    use grid_m
    use mode_m
    use mode_par_m
    use num_par_m
    use orbit_par_m
    use osc_par_m
+   use point_m
    use resp_m
    use state_m
    use sysmtx_m
@@ -85,8 +86,8 @@ contains
 
    function nad_bvp_t_(cx, gr, md_p, nm_p, os_p) result(bp)
 
+      use bound_conds_m
       use nad_factory_m
-      use nad_diff_m
 
       class(context_t), pointer, intent(in) :: cx
       type(grid_t), intent(in)              :: gr
@@ -95,30 +96,18 @@ contains
       type(osc_par_t), intent(in)           :: os_p
       type(nad_bvp_t)                       :: bp
 
-      class(bound_ct), allocatable       :: bd_i
-      class(bound_ct), allocatable       :: bd_o
-      integer                            :: j
-      type(diff_element_ct), allocatable :: de(:)
+      class(bound_conds_ct), allocatable :: bc_i
+      class(bound_conds_ct), allocatable :: bc_o
+      type(point_t), allocatable         :: pt_m(:)
 
-      ! Construct the nad_bvp_t
+      ! Construct the nad_bvp type
 
-      ! Initialize the boundary conditions
+      ! Initialize the base type
 
-      bd_i = nad_ibound_t(cx, os_p)
-      bd_o = nad_obound_t(cx, os_p)
+      bc_i = nad_ibound_conds_t(cx, os_p)
+      bc_o = nad_obound_conds_t(cx, os_p)
 
-      ! Initialize the difference equations
-
-      allocate(de(gr%n-1))
-
-      !$OMP PARALLEL DO
-      do j = 1, gr%n-1
-         allocate(de(j)%df, SOURCE=nad_diff_t(cx, gr%pt(j), gr%pt(j+1), nm_p, os_p))
-      end do
-
-      ! Initialize the bvp_t
-
-      bp%bvp_ct = bvp_ct(bd_i, bd_o, de, nm_p)
+      bp%bvp_ct = bvp_ct(gr, bc_i, bc_o, diff_eqns_factory_, match_conds_factory_, nm_p)
 
       ! Other initializations
 
@@ -138,6 +127,50 @@ contains
       ! Finish
 
       return
+
+   contains
+
+      subroutine diff_eqns_factory_(pt, de)
+
+         type(point_t), intent(in)                     :: pt(:)
+         class(diff_eqns_ct), allocatable, intent(out) :: de(:)
+
+         ! Initialize the differential equations
+
+         #:if defined('GFORTRAN_PR125610')
+         de = nad_diff_eqns_t_1_(cx, pt, os_p)
+         #:else
+         de = nad_diff_eqns_t(cx, pt, os_p)
+         #:endif
+
+         ! Finish
+
+         return
+
+      end subroutine diff_eqns_factory_
+
+      !****
+
+      subroutine match_conds_factory_(pt, mc)
+
+         use match_conds_m
+
+         type(point_t), intent(in)                       :: pt(:)
+         class(match_conds_ct), allocatable, intent(out) :: mc(:)
+
+         ! Initialize the match conditions
+
+         #:if defined('GFORTRAN_PR125610')
+         mc = nad_match_conds_t_1_(cx, pt, os_p)
+         #:else
+         mc = nad_match_conds_t(cx, pt, os_p)
+         #:endif
+
+         ! Finish
+
+         return
+
+      end subroutine match_conds_factory_
 
    end function nad_bvp_t_
 

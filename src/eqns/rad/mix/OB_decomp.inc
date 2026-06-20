@@ -1,5 +1,11 @@
+
+if (trans_) then
+B(1, 1) = a_11 - chi
+B(2, 1) = a_12
+else
 B(1, 1) = a_11 - chi
 B(1, 2) = a_12
-if (PRESENT(f)) then
-f(1) = 0
+endif
+if (PRESENT(s)) then
+s(1) = 0
 endif

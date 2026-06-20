@@ -23,9 +23,14 @@ module bvp_m
 
    use forum_m, only: RD
 
-   use bound_m
-   use diff_element_m
+   use bound_block_m
+   use bound_conds_m
+   use diff_block_factory_m
    use ext_m
+   use grid_m
+   use inter_element_m
+   use inter_block_m
+   use match_block_m
    use num_par_m
    use state_m
    use status_m
@@ -43,13 +48,13 @@ module bvp_m
 
       type :: bvp_${S}$
          private
-         class(diff_element_${S}$), allocatable :: de(:)
-         class(bound_${S}$), allocatable        :: bd_i
-         class(bound_${S}$), allocatable        :: bd_o
-         integer, public                        :: n
-         integer, public                        :: n_e
-         integer, public                        :: n_i
-         integer, public                        :: n_o
+         class(bound_block_${S}$), allocatable   :: bb_i
+         class(bound_block_${S}$), allocatable   :: bb_o
+         class(inter_element_${S}$), allocatable :: ie(:)
+         integer, public                         :: n
+         integer, public                         :: n_e
+         integer, public                         :: n_i
+         integer, public                         :: n_o
       contains
          private
          procedure, public :: eval_det => eval_det_${S}$_
@@ -77,45 +82,73 @@ contains
 
    #:for T, S in zip(DTYPE_BASE_TYPES, DTYPE_SUFFIXES)
 
-      function bvp_${S}$_(bd_i, bd_o, de, nm_p) result(bp)
+      function bvp_${S}$_(gr, bc_i, bc_o, diff_eqns_factory, match_conds_factory, nm_p) result(bp)
 
-         class(bound_${S}$), intent(in)        :: bd_i
-         class(bound_${S}$), intent(in)        :: bd_o
-         class(diff_element_${S}$), intent(in) :: de(:)
-         type(num_par_t), intent(in)           :: nm_p
-         type(bvp_${S}$)                       :: bp
+         type(grid_t), intent(in)             :: gr
+         class(bound_conds_${S}$), intent(in) :: bc_i
+         class(bound_conds_${S}$), intent(in) :: bc_o
+         interface
+            subroutine diff_eqns_factory(pt, de)
+               use diff_eqns_m
+               use point_m
+               type(point_t), intent(in)                        :: pt(:)
+               class(diff_eqns_${S}$), allocatable, intent(out) :: de(:)
+            end subroutine diff_eqns_factory
+            subroutine match_conds_factory(pt, mc)
+               use match_conds_m
+               use point_m
+               type(point_t), intent(in)                          :: pt(:)
+               class(match_conds_${S}$), allocatable, intent(out) :: mc(:)
+            end subroutine match_conds_factory
+         end interface
+         type(num_par_t), intent(in) :: nm_p
+         type(bvp_${S}$)             :: bp
 
          integer :: n
          integer :: n_e
          integer :: n_i
          integer :: n_o
+         integer :: j
 
-         ! Perform basic validations
+         ! Perform basic dimension validations
 
-         n = SIZE(de) + 1
+         n = gr%n
 
-         @:CHECK_BOUNDS(bd_i%n_e, bd_o%n_e)
+         n_e = bc_i%n_e
+         @:CHECK_BOUNDS(bc_o%n_e, n_e)
 
-         n_e = bd_i%n_e
-
-         n_i = bd_i%n_b
-         n_o = bd_o%n_b
+         n_i = bc_i%n_b
+         n_o = bc_o%n_b
 
          @:CHECK_BOUNDS(n_i+n_o, n_e)
 
-         block
-            integer :: i_de
-            do i_de = 1, SIZE(de)
-               @:ASSERT_DEBUG(de(i_de)%df%n_e == n_e, 'dimension mismatch')
-            end do
-         end block
+         ! Set up blocks
 
-         ! Construct the bvp type
+         bp%bb_i = bound_block_${S}$(bc_i)
+         bp%bb_o = bound_block_${S}$(bc_o)
 
-         allocate(bp%de, SOURCE=de)
+         allocate(bp%ie(n-1))
 
-         bp%bd_i = bd_i
-         bp%bd_o = bd_o
+         !$OMP PARALLEL DO
+         do j = 1, n-1
+
+            associate( &
+               pt_a => gr%pt(j), &
+               pt_b => gr%pt(j+1))
+
+               if (pt_a%s == pt_b%s) then
+                  allocate(bp%ie(j)%ib, SOURCE=diff_block_${S}$(diff_eqns_factory, pt_a, pt_b, nm_p))
+               else
+                  allocate(bp%ie(j)%ib, SOURCE=match_block_${S}$(match_conds_factory, pt_a, pt_b))
+               end if
+
+               @:CHECK_BOUNDS(bp%ie(j)%ib%n_e, n_e)
+
+            end associate
+
+         end do
+
+         ! Other initializations
 
          bp%n = n
          bp%n_e = n_e
@@ -144,7 +177,7 @@ contains
 
          ! Evaluate the determinant of the sysmtx
 
-         call sm%eval_det(st, this%bd_i, this%bd_o, this%de, det)
+         call sm%eval_det(st, this%bb_i, this%bb_o, this%ie, det)
 
          ! Finish
 
@@ -173,7 +206,7 @@ contains
 
          ! Evaluate the solution vector y of the homogeneous system
 
-         call sm%solve_hom(st, this%bd_i, this%bd_o, this%de, u)
+         call sm%solve_hom(st, this%bb_i, this%bb_o, this%ie, u)
 
          y = RESHAPE(u, SHAPE(y))
 
@@ -204,7 +237,7 @@ contains
 
          ! Evaluate the solution vector y of the inhomogeneous system
 
-         call sm%solve_inhom(st, this%bd_i, this%bd_o, this%de, u)
+         call sm%solve_inhom(st, this%bb_i, this%bb_o, this%ie, u)
 
          y = RESHAPE(u, SHAPE(y))
 
