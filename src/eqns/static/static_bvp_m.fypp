@@ -175,7 +175,7 @@ contains
       class(sysmtx_rt), intent(inout) :: sm
       type(state_rt), intent(in)      :: st
       integer, intent(in)             :: id
-      type(orbit_par_t)               :: or_p
+      type(orbit_par_t), intent(in)   :: or_p
       integer, intent(in)             :: k
       type(resp_t)                    :: rs
 

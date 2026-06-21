@@ -98,7 +98,6 @@ contains
 
       class(bound_conds_ct), allocatable :: bc_i
       class(bound_conds_ct), allocatable :: bc_o
-      type(point_t), allocatable         :: pt_m(:)
 
       ! Construct the nad_bvp type
 
@@ -219,7 +218,7 @@ contains
       class(sysmtx_ct), intent(inout) :: sm
       type(state_ct), intent(in)      :: st
       integer, intent(in)             :: id
-      type(orbit_par_t)               :: or_p
+      type(orbit_par_t), intent(in)   :: or_p
       integer, intent(in)             :: k
       type(resp_t)                    :: rs
 

@@ -66,6 +66,7 @@ module colloc_gl2_block_m
             use ext_m
             use state_m
             import colloc_gl2_block_${S}$
+            implicit none (type, external)
             class(colloc_gl2_block_${S}$), intent(in) :: this
             class(state_${S}$), intent(in)            :: st
             ${T}$, contiguous, intent(out)            :: E(:,:)
@@ -78,6 +79,7 @@ module colloc_gl2_block_m
             use ext_m
             use state_m
             import colloc_gl2_block_${S}$
+            implicit none (type, external)
             class(colloc_gl2_block_${S}$), intent(in) :: this
             class(state_${S}$), intent(in)            :: st
             ${T}$, contiguous, intent(out)            :: E(:,:)

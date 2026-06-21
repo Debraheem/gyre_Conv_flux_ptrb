@@ -91,12 +91,14 @@ contains
             subroutine diff_eqns_factory(pt, de)
                use diff_eqns_m
                use point_m
+               implicit none (type, external)
                type(point_t), intent(in)                        :: pt(:)
                class(diff_eqns_${S}$), allocatable, intent(out) :: de(:)
             end subroutine diff_eqns_factory
             subroutine match_conds_factory(pt, mc)
                use match_conds_m
                use point_m
+               implicit none (type, external)
                type(point_t), intent(in)                          :: pt(:)
                class(match_conds_${S}$), allocatable, intent(out) :: mc(:)
             end subroutine match_conds_factory
