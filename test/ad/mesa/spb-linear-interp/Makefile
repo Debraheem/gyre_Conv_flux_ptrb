@@ -1,1 +1,1 @@
-../../../common/Makefile.ad
+../../../common/Makefile

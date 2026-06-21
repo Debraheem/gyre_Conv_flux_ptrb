@@ -154,9 +154,10 @@ ifeq ($(FPE),yes)
 endif
 
 ifeq ($(DEBUG),yes)
-   FFLAGS += -Og -ggdb -fcheck=all \
-             -Wall -Wno-unused-dummy-argument -Wno-maybe-uninitialized \
-             -finline-limit=0 -fbacktrace
+   FFLAGS += -Og -ggdb -fcheck=all -Wall -finline-limit=0 -fbacktrace
+   ifeq ($(DEBUG_QUIET),yes)
+      FFLAGS += -fcheck=no-array-temps -Wno-unused-dummy-argument -Wno-maybe-uninitialized
+   endif
 else
    FFLAGS += -O3 -fno-backtrace -g
    ifeq ($(PORTABLE),yes)

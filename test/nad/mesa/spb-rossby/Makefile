@@ -1,1 +1,1 @@
-../../../common/Makefile.nad
+../../../common/Makefile

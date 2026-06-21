@@ -1,20 +1,25 @@
 # File     : Makefile
 # Purpose  : makefile for wdec subdir
 
+# General make settings
+
+export SH = /bin/bash
+export MAKEFLAGS += --no-print-directory
+
 # Variables
 
-SUBDIRS=m0.593
+SUBDIRS = m0.593
 
 # Rules
 
 test :
-	@for DIR in ${SUBDIRS}; do \
-            make -C $${DIR}; \
+	@for DIR in $(SUBDIRS); do \
+            make -C $$DIR; \
         done
 
-build_ref build_ref_arch :
-	@for DIR in ${SUBDIRS}; do \
-            make -C $${DIR} $@; \
+build_ref :
+	@for DIR in $(SUBDIRS); do \
+            make -C $$DIR $@; \
         done
 
-.PHONY: test build_ref build_ref_arch
+.PHONY: test build_ref

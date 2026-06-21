@@ -51,7 +51,11 @@ check_output ()
     # If file_b isn't set, use ref file
 
     if [ ! -e "$file_b" ]; then
+	if [[ "$DEBUG" == "yes" ]]; then
+	    file_b="ref-debug/${file_a}"
+	else
 	    file_b="ref/${file_a}"
+	fi
     fi
 
     # Check for the existence of the files

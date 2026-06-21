@@ -1,9 +1,14 @@
 # File     : Makefile
 # Purpose  : makefile for test subdir
 
+# General make settings
+
+export SH = /bin/bash
+export MAKEFLAGS += --no-print-directory
+
 # Variables
 
-SUBDIRS=ad nad tides
+SUBDIRS = ad nad tides
 
 # Rules
 
@@ -12,13 +17,13 @@ ifneq ($(PORTABLE),yes)
 endif
 
 test :
-	@for DIR in ${SUBDIRS}; do \
-            make -C $${DIR}; \
+	@for DIR in $(SUBDIRS); do \
+            make -C $$DIR; \
         done
 
-build_ref build_ref_arch :
-	@for DIR in ${SUBDIRS}; do \
-            make -C $${DIR} $@; \
+build_ref :
+	@for DIR in $(SUBDIRS); do \
+            make -C $$DIR $@; \
         done
 
-.PHONY: test build_ref build_ref_arch
+.PHONY: test build_ref

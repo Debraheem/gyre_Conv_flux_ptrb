@@ -1,19 +1,38 @@
 # File     : Makefile
 # Purpose  : makefile for standard tides subdir
 
+# General make settings
+
+export SH = /bin/bash
+export MAKEFLAGS += --no-print-directory
+
+# Variables
+
+ifeq ($(DEBUG),yes)
+   REF_DIR = ref-debug
+else
+   REF_DIR = ref
+endif
+
 # Rules
 
 test :
 	@./test.sh
 
 build_ref :
-	./gyre_tides gyre_tides.in; \
+	@./gyre_tides gyre_tides.in >& /dev/null; \
         for file in summary*.h5; do \
-	    if h5diff -q $$file ref/$$file; then \
-                rm $$file; \
+            if [ -e $(REF_DIR)/$$file ]; then \
+                if ./h5pydiff.py -q $$file $(REF_DIR)/$$file; then \
+                    rm $$file; \
+                else \
+                    echo "updating $(CURDIR)/$(REF_DIR)/$$file"; \
+                    mv $$file $(REF_DIR)/$$file; \
+                fi; \
             else \
-	        mv $$file ref/$$file; \
+                echo "creating $(CURDIR)/$(REF_DIR)/$$file"; \
+                mv $$file $(REF_DIR)/$$file; \
             fi; \
-	done
+        done
 
 .PHONY: test build_ref

@@ -1,5 +1,10 @@
 # File     : Makefile
-# Purpose  : makefile for standard poly subdir
+# Purpose  : makefile for poly 3.0 subdir
+
+# General make settings
+
+export SH = /bin/bash
+export MAKEFLAGS += --no-print-directory
 
 # Rules
 
@@ -7,5 +12,6 @@ test :
 	@./test.sh
 
 build_ref :
+	@:
 
-.PHONY: test build_ref build_ref_arch
+.PHONY: test build_ref

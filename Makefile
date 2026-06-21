@@ -23,6 +23,9 @@ EXTERNAL_FORUM_PKG ?= forum
 # Enable debugging (with a performance penalty)
 DEBUG ?= no
 
+# When DEBUG is yes, suppress some warning messages
+DEBUG_QUIET ?= yes
+
 # Build & link against shared libraries (with a possible performance
 # penalty)
 SHARED ?= no
@@ -55,6 +58,7 @@ export IFACES
 export EXTERNAL_FORUM
 export EXTERNAL_FORUM_PKG
 export DEBUG
+export DEBUG_QUIET
 export SHARED
 export OMP
 export FPE
