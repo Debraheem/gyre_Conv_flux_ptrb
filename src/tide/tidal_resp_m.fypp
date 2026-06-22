@@ -142,12 +142,6 @@ contains
 
             ! Create the bvp_t's
 
-            ! if (os_p%alpha_trb > 0._RD) then
-            !    bp_nad = tnad_bvp_t(cx(l,m), gr, md_p(l,m), nm_p, os_p)
-            ! else
-            !    bp_nad = nad_bvp_t(cx(l,m), gr, md_p(l,m), nm_p, os_p)
-            ! endif
-
             bp_dyn = nad_bvp_t(cx(l,m), gr, md_p(l,m), nm_p, os_p)
 
             bp_stat = static_bvp_t(cx(l,m), gr, md_p(l,m), nm_p, os_p)
