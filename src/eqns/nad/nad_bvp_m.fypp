@@ -39,7 +39,6 @@ module nad_bvp_m
    use state_m
    use sysmtx_m
    use trans_m
-   use turb_m
    use wave_m
 
    use ISO_FORTRAN_ENV
@@ -54,9 +53,7 @@ module nad_bvp_m
       private
       type(context_t), pointer     :: cx => null()
       class(trans_ct), allocatable :: tr(:)
-      real(RD), allocatable        :: V(:)
       real(RD), allocatable        :: V_g(:)
-      real(RD), allocatable        :: As(:)
       real(RD), allocatable        :: c_1(:)
       real(RD), allocatable        :: ups_T(:)
       real(RD), allocatable        :: Omega_rot(:)
@@ -124,11 +121,9 @@ contains
 
          ml => cx%model()
 
-         call check_model(ml, [I_V_2,I_AS,I_C_1,I_GAMMA_1,I_UPS_T])
+         call check_model(ml, [I_V_2,I_C_1,I_GAMMA_1,I_UPS_T])
 
-         allocate(bp%V(gr%n))
          allocate(bp%V_g(gr%n))
-         allocate(bp%As(gr%n))
          allocate(bp%c_1(gr%n))
          allocate(bp%ups_T(gr%n))
          allocate(bp%Omega_rot(gr%n))
@@ -138,9 +133,7 @@ contains
 
             associate(pt => gr%pt(j))
 
-               bp%V(j) = ml%coeff(I_V_2, pt)*pt%x**2
-               bp%V_g(j) = bp%V(j)/ml%coeff(I_GAMMA_1, pt)
-               bp%As(j) = ml%coeff(I_AS, pt)
+               bp%V_g(j) = ml%coeff(I_V_2, pt)*pt%x**2/ml%coeff(I_GAMMA_1, pt)
                bp%c_1(j) = ml%coeff(I_C_1, pt)
                bp%ups_T(j) = ml%coeff(I_UPS_T, pt)
 
@@ -341,9 +334,7 @@ contains
 
       associate( &
          omega => st%omega, &
-         V => bp%V(j), &
          V_g => bp%V_g(j), &
-         As => bp%As(j), &
          c_1 => bp%c_1(j), &
          ups_T => bp%ups_T(j), &
          Omega_rot => bp%Omega_rot(j), &
@@ -351,8 +342,6 @@ contains
          alpha_grv => bp%cx%alpha_grv, &
          alpha_omg => bp%cx%alpha_omg, &
          alpha_gam => bp%cx%alpha_gam, &
-         alpha_trb => bp%cx%alpha_trb, &
-         alpha_con => bp%cx%alpha_con, &
          m => bp%cx%m)
 
          omega_c = omega - m*Omega_rot
@@ -365,7 +354,7 @@ contains
          om2 = c_1*alpha_omg*omega_c**2
          eta = lambda/om2
 
-         F_trb = i_omega_c*c_trb(V, As, c_1, alpha_trb, alpha_con, REAL(omega_c, RD))
+         F_trb = i_omega_c*bp%cx%c_trb(st, bp%gr%pt(j))
 
          ! Set upt the Q matrix
 

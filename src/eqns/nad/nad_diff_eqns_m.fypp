@@ -34,7 +34,6 @@ module ${P}$_nad_diff_eqns_m
    use osc_par_m
    use point_m
    use state_m
-   use turb_m
 
    use ISO_FORTRAN_ENV
 
@@ -108,8 +107,6 @@ contains
       type(${P}$_nad_diff_eqns_t)          :: de
 
       class(model_t), pointer :: ml
-      complex(RD)             :: eps_rho
-      complex(RD)             :: eps_T
 
       ! Construct the nad_diff_eqns type
 
@@ -326,7 +323,7 @@ contains
          del_x = del/x
 
          if (alpha_trb > 0._RD) then
-            F_trb = i_omega_c*c_trb(V, As, c_1, alpha_trb, alpha_con, REAL(omega, RD))
+            F_trb = i_omega_c*this%cx%c_trb(st, pt)
             #:include 'A_trb.inc'
          else
             #:include 'A.inc'
