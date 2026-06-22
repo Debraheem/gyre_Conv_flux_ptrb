@@ -122,10 +122,6 @@ nad_SRCS = nad_bvp_m.fypp nad_factory_m.fypp \
    gyre_nad_obound_conds_m.fypp dziem_nad_obound_conds_m.fypp jcd_nad_obound_conds_m.fypp \
    rjcd_nad_obound_conds_m.fypp mix_nad_obound_conds_m.fypp lagp_nad_obound_conds_m.fypp
 
-tnad_SRCS = tnad_bvp_m.fypp tnad_factory_m.fypp \
-   gyre_tnad_diff_eqns_m.fypp \
-   gyre_tnad_match_conds_m.fypp
-
 static_SRCS = static_bvp_m.fypp \
    static_diff_eqns_m.fypp \
    static_match_conds_m.fypp \
@@ -149,7 +145,7 @@ bvp_SRCS = bvp_m.fypp
 eqns_SRCS = diff_eqns_m.fypp bound_conds_m.fypp match_conds_m.fypp
 
 libgyre_SRCS = \
-   $(ad_SRCS) $(rad_SRCS) $(nad_SRCS) $(tnad_SRCS) $(static_SRCS) 			\
+   $(ad_SRCS) $(rad_SRCS) $(nad_SRCS) $(static_SRCS) 					\
    $(block_SRCS) $(sysmtx_SRCS) $(eqns_SRCS) $(search_SRCS) $(bvp_SRCS)	        	\
    adhoc_angular_m.fypp amdl_file_m.fypp						\
    anapoly_0_model_m.fypp anapoly_1_model_m.fypp anapoly_5_model_m.fypp			\
@@ -159,7 +155,7 @@ libgyre_SRCS = \
    constants_m.fypp context_m.fypp							\
    contour_map_m.fypp contour_path_m.fypp						\
    cubic_interp_m.fypp deriv_m.fypp detail_m.fypp 					\
-   discrim_m.fypp evol_model_m.fypp						\
+   discrim_m.fypp evol_model_m.fypp							\
    ext_complex_m.fypp ext_m.fypp ext_real_m.fypp famdl_file_m.fypp			\
    fgong_file_m.fypp freq_context_m.fypp freq_m.fypp gyre_m.fypp			\
    grid_m.fypp grid_par_m.fypp grid_refine_m.fypp					\

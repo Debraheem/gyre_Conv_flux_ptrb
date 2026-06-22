@@ -35,7 +35,6 @@ module prox_search_m
    use state_m
    use status_m
    use sysmtx_m
-   use tnad_bvp_m
    use util_m
    use wave_m
 
@@ -662,8 +661,6 @@ contains
          select type (bp)
          type is (nad_bvp_t)
             md = mode_t(bp, sm, state_ct(pr(i)%omega_root, omega_r=pr(i)%omega_r), pr(i)%id, pr(i)%chi, pr(i)%n_iter)
-!         type is (tnad_bvp_t)
-!            md = mode_t(bp, sm, state_ct(pr(i)%omega_root, omega_r=pr(i)%omega_r), pr(i)%id, pr(i)%chi, pr(i)%n_iter)
          class default
             @:ABORT('invalid bp class')
          end select
