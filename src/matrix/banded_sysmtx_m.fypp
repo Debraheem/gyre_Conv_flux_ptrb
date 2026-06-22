@@ -211,10 +211,8 @@ contains
          logical, intent(in), optional             :: set_F
 
          logical         :: set_F_
-         ${T}$           :: B_i(this%n_i,this%n_e)
-         ${T}$           :: B_o(this%n_o,this%n_e)
-         type(ext_${S}$) :: scl_i
-         type(ext_${S}$) :: scl_o
+         ${T}$           :: B_i(this%n_e,this%n_i)
+         ${T}$           :: B_o(this%n_e,this%n_o)
          ${T}$           :: E_t(2*this%n_e,this%n_e)
          ${T}$           :: F(this%n_e)
          integer         :: i
@@ -235,30 +233,30 @@ contains
             ! Build the boundary blocks, and row-scale to unity
 
             if (set_F_) then
-               call bb_i%eval(st, B_i, scl_i, G=F(:n_i))
+               call bb_i%eval(st, B_i, G=F(:n_i), trans=.TRUE.)
             else
-               call bb_i%eval(st, B_i, scl_i)
+               call bb_i%eval(st, B_i, trans=.TRUE.)
             end if
 
             do i = 1, n_i
-               scl = MAXVAL(abs(B_i(i,:)))
+               scl = MAXVAL(abs(B_i(:,i)))
                this%scl_i(i) = scl
-               call this%set_row_(i, 1, B_i(i,:)/scl)
+               call this%set_row_(i, 1, B_i(:,i)/scl)
                if (set_F_) then
                   this%F(i) = F(i)/scl
                end if
             end do
 
             if (set_F_) then
-               call bb_o%eval(st, B_o, scl_o, G=F(n_i+1:))
+               call bb_o%eval(st, B_o, G=F(n_i+1:), trans=.TRUE.)
             else
-               call bb_o%eval(st, B_o, scl_o)
+               call bb_o%eval(st, B_o, trans=.TRUE.)
             end if
 
             do i = 1, n_o
-               scl = MAXVAL(abs(B_o(i,:)))
+               scl = MAXVAL(abs(B_o(:,i)))
                this%scl_o(i) = scl
-               call this%set_row_(n_e*n+n_i+i, n_e*n+1, B_o(i,:)/scl)
+               call this%set_row_(n_e*n+n_i+i, n_e*n+1, B_o(:,i)/scl)
                if (set_F_) then
                   this%F(n_e*n+n_i+1) = F(n_i+i)/scl
                end if

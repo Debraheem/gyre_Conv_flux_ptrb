@@ -88,12 +88,11 @@ contains
 
       !****
 
-      subroutine eval_${S}$_(this, st, B, scl, G, trans)
+      subroutine eval_${S}$_(this, st, B, G, trans)
 
          class(bound_block_${S}$), intent(in)     :: this
          class(state_${S}$), intent(in)           :: st
          ${T}$, contiguous, intent(out)           :: B(:,:)
-         type(ext_${S}$), intent(out)             :: scl
          ${T}$, contiguous, intent(out), optional :: G(:)
          logical, intent(in), optional            :: trans
 
@@ -120,8 +119,6 @@ contains
          ! Evaluate the block
 
          call this%bc%eval(st, B, s=G, trans=trans)
-
-         scl = ONE_${S}$
 
          ! Finish
 

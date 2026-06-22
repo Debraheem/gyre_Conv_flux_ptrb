@@ -189,10 +189,8 @@ contains
             ${T}$           :: F_tmp
             ${T}$           :: alpha
             ${T}$           :: beta
-            ${T}$           :: B_i(this%n_i,this%n_e)
-            ${T}$           :: B_o(this%n_o,this%n_e)
-            type(ext_${S}$) :: scl_i
-            type(ext_${S}$) :: scl_o
+            ${T}$           :: B_i(this%n_e,this%n_i)
+            ${T}$           :: B_o(this%n_e,this%n_o)
             ${T}$           :: R_t(2*this%n_e,2*this%n_e)
             ${T}$           :: piv_row_R(2*this%n_e)
 
@@ -447,18 +445,18 @@ contains
 
                if (set_F_) then
                   F(:n_e) = this%F(:,1)
-                  call bb_i%eval(st, B_i, scl_i, G=F(n_e+1:n_e+n_i))
-                  call bb_o%eval(st, B_o, scl_o, G=F(n_e+n_i+1:))
+                  call bb_i%eval(st, B_i, G=F(n_e+1:n_e+n_i), trans=.TRUE.)
+                  call bb_o%eval(st, B_o, G=F(n_e+n_i+1:), trans=.TRUE.)
                else
-                  call bb_i%eval(st, B_i, scl_i)
-                  call bb_o%eval(st, B_o, scl_o)
+                  call bb_i%eval(st, B_i, trans=.TRUE.)
+                  call bb_o%eval(st, B_o, trans=.TRUE.)
                end if
 
-               R_t(:n_e,n_e+1:n_e+n_i) = TRANSPOSE(B_i)
+               R_t(:n_e,n_e+1:n_e+n_i) = B_i
                R_t(n_e+1:,n_e+1:n_e+n_i) = 0._RD
 
                R_t(:n_e,n_e+n_i+1:) = 0._RD
-               R_t(n_e+1:,n_e+n_i+1:) = TRANSPOSE(B_o)
+               R_t(n_e+1:,n_e+n_i+1:) = B_o
 
                rscl(:n_e) = this%rscl(:,1)
 

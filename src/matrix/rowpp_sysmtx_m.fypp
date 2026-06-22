@@ -161,10 +161,8 @@ contains
             logical         :: set_blk_
             logical         :: set_D_
             logical         :: set_F_
-            ${T}$           :: B_i(${N_I}$,${N_E}$)
-            ${T}$           :: B_o(${N_O}$,${N_E}$)
-            type(ext_${S}$) :: scl_i
-            type(ext_${S}$) :: scl_o
+            ${T}$           :: B_i(${N_E}$,${N_I}$)
+            ${T}$           :: B_o(${N_E}$,${N_O}$)
             integer         :: k
             ${T}$           :: M_t(2*${N_E}$,${N_I}$+${N_E}$)
             ${T}$           :: F(${N_I}$+${N_E}$)
@@ -214,9 +212,9 @@ contains
             associate (n => this%n, n_e => ${N_E}$, n_i => ${N_I}$, n_o => ${N_O}$)
 
                if (set_F_) then
-                  call bb_i%eval(st, B_i, scl_i, G=F(:n_i))
+                  call bb_i%eval(st, B_i, G=F(:n_i), trans=.TRUE.)
                else
-                  call bb_i%eval(st, B_i, scl_i)
+                  call bb_i%eval(st, B_i, trans=.TRUE.)
                end if
 
                ! First, build and factorize the first n blocks
@@ -229,7 +227,7 @@ contains
 
                   if (k == 1) then
 
-                     M_t(:n_e,:n_i) = TRANSPOSE(B_i)
+                     M_t(:n_e,:n_i) = B_i
                      M_t(n_e+1:,:n_i) = 0._RD
 
                      if (set_F_) then
@@ -366,13 +364,13 @@ contains
 
                if (set_F_) then
                   F(:n_i) = F(n_e+1:)
-                  call bb_o%eval(st, B_o, scl_o, G=F(n_i+1:n_e))
+                  call bb_o%eval(st, B_o, G=F(n_i+1:n_e), trans=.TRUE.)
                else
-                  call bb_o%eval(st, B_o, scl_o)
+                  call bb_o%eval(st, B_o, trans=.TRUE.)
                end if
 
                R_t(:,:n_i) = M_t(n_e+1:,n_e+1:)
-               R_t(:,n_i+1:) = TRANSPOSE(B_o)
+               R_t(:,n_i+1:) = B_o
 
                rscl(:n_i) = rscl(n_e+1:)
 
