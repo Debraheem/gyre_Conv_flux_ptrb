@@ -146,11 +146,9 @@ contains
 
             bp_stat = static_bvp_t(cx(l,m), gr, md_p(l,m), nm_p, os_p)
 
-            allocate(sm_dyn, SOURCE=sysmtx_ct(bp_dyn%n-1, bp_dyn%n_e, bp_dyn%n_i, &
-               bp_dyn%n_o, nm_p%nad_matrix_solver))
+            allocate(sm_dyn, SOURCE=sysmtx_ct(bp_dyn, nm_p%nad_matrix_solver))
 
-            allocate(sm_stat, SOURCE=sysmtx_rt(bp_stat%n-1, bp_stat%n_e, bp_stat%n_i, &
-               bp_stat%n_o, nm_p%nad_matrix_solver))
+            allocate(sm_stat, SOURCE=sysmtx_rt(bp_stat, nm_p%nad_matrix_solver))
 
             !$OMP PARALLEL DO ORDERED FIRSTPRIVATE(sm_dyn, sm_stat) &
             !$OMP PRIVATE(st_dyn, st_stat, rs) SCHEDULE(STATIC, 1)
