@@ -139,9 +139,17 @@ contains
                pt_b => gr%pt(j+1))
 
                if (pt_a%s == pt_b%s) then
-                  allocate(bp%ie(j)%ib, SOURCE=diff_block_${S}$(diff_eqns_factory, pt_a, pt_b, nm_p))
+                  #:if defined('GFORTRAN_PR110877')
+                     allocate(bp%ie(j)%ib, SOURCE=diff_block_${S}$(diff_eqns_factory, pt_a, pt_b, nm_p))
+                  #:else
+                     bp%ie(j)%ib = diff_block_${S}$(diff_eqns_factory, pt_a, pt_b, nm_p)
+                  #:endif
                else
-                  allocate(bp%ie(j)%ib, SOURCE=match_block_${S}$(match_conds_factory, pt_a, pt_b))
+                  #:if defined('GFORTRAN_PR110877')
+                     allocate(bp%ie(j)%ib, SOURCE=match_block_${S}$(match_conds_factory, pt_a, pt_b))
+                  #:else
+                     bp%ie(j)%ib = match_block_${S}$(match_conds_factory, pt_a, pt_b)
+                  #:endif
                end if
 
                @:CHECK_BOUNDS(bp%ie(j)%ib%n_e, n_e)

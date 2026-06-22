@@ -148,7 +148,11 @@ contains
 
       ! Initialize the evol_model_t
 
-      allocate(em, SOURCE=evol_model_t(x, M_star, R_star, 0._RD, ml_p))
+      #:if defined('GFORTRAN_PR110877')
+         allocate(em, SOURCE=evol_model_t(x, M_star, R_star, 0._RD, ml_p))
+      #:else
+         em = evol_model_t(x, M_star, R_star, 0._RD, ml_p)
+      #:endif
 
       call em%define(I_V_2, V_2)
       call em%define(I_AS, AS)

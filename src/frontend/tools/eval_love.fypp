@@ -166,7 +166,11 @@ program eval_love
 
    bp = static_bvp_t(cx, gr, md_p, nm_p, os_p)
 
-   allocate(sm, SOURCE=sysmtx_rt(bp, 'BANDED'))
+   #:if defined('GFORTRAN_PR110877')
+      allocate(sm, SOURCE=sysmtx_rt(bp, 'BANDED'))
+   #:else
+      sm = sysmtx_rt(bp, 'BANDED')
+   #:endif
 
    A = 1._RD
 

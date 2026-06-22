@@ -65,8 +65,13 @@ contains
 
       ! Initialize the parfaitd_model_t
 
-      allocate(pm, SOURCE=parfaitd_model_t(parfait_model_t(x, d, Gamma_1, y_c, z_s, ml_p), &
-         M_star, R_star))
+      #:if defined('GFORTRAN_PR110877')
+         allocate(pm, SOURCE=parfaitd_model_t(parfait_model_t(x, d, Gamma_1, y_c, z_s, ml_p), &
+            M_star, R_star))
+      #:else
+         pm = parfaitd_model_t(parfait_model_t(x, d, Gamma_1, y_c, z_s, ml_p), &
+            M_star, R_star)
+      #:endif
 
       ! Return a pointer
 

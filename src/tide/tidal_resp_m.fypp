@@ -143,12 +143,15 @@ contains
             ! Create the bvp_t's
 
             bp_dyn = nad_bvp_t(cx(l,m), gr, md_p(l,m), nm_p, os_p)
-
             bp_stat = static_bvp_t(cx(l,m), gr, md_p(l,m), nm_p, os_p)
 
-            allocate(sm_dyn, SOURCE=sysmtx_ct(bp_dyn, nm_p%nad_matrix_solver))
-
-            allocate(sm_stat, SOURCE=sysmtx_rt(bp_stat, nm_p%nad_matrix_solver))
+            #:if defined('GFORTRAN_PR110877')
+               allocate(sm_dyn, SOURCE=sysmtx_ct(bp_dyn, nm_p%nad_matrix_solver))
+               allocate(sm_stat, SOURCE=sysmtx_rt(bp_stat, nm_p%nad_matrix_solver))
+            #:else
+               sm_dyn = sysmtx_ct(bp_dyn, nm_p%nad_matrix_solver)
+               sm_stat = sysmtx_rt(bp_stat, nm_p%nad_matrix_solver)
+            #:endif
 
             !$OMP PARALLEL DO ORDERED FIRSTPRIVATE(sm_dyn, sm_stat) &
             !$OMP PRIVATE(st_dyn, st_stat, rs) SCHEDULE(STATIC, 1)

@@ -96,7 +96,11 @@ contains
 
          ! Construct the sysmtx type from the supplied bvp
 
-         allocate(sm, SOURCE=sysmtx_${S}$(bp%n-1, bp%n_e, bp%n_i, bp%n_o, matrix_solver))
+         #:if defined('GFORTRAN_PR110877')
+            allocate(sm, SOURCE=sysmtx_${S}$(bp%n-1, bp%n_e, bp%n_i, bp%n_o, matrix_solver))
+         #:else
+            sm = sysmtx_${S}$(bp%n-1, bp%n_e, bp%n_i, bp%n_o, matrix_solver)
+         #:endif
 
          ! Finish
 

@@ -398,7 +398,13 @@ contains
                bp_ad = ad_bvp_t(cx, gr, md_p_m(i), nm_p_sel, os_p_sel)
             endif
 
-            allocate(sm_ad, SOURCE=sysmtx_rt(bp_ad, nm_p_sel%ad_matrix_solver))
+            #:if defined('GFORTRAN_PR110877')
+               allocate(em, SOURCE=evol_model_t(x, M_star, R_star, 0._RD, ml_p))
+               allocate(sm_ad, SOURCE=sysmtx_rt(bp_ad, nm_p_sel%ad_matrix_solver))
+            #:else
+               em = evol_model_t(x, M_star, R_star, 0._RD, ml_p)
+               sm_ad = sysmtx_rt(bp_ad, nm_p_sel%ad_matrix_solver)
+            #:endif
 
             select case (nm_p_sel%ad_search)
 

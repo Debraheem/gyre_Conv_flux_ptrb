@@ -133,7 +133,11 @@ contains
 
       cx%ml => ml
 
-      allocate(cx%an, SOURCE=angular_ct(md_p, os_p))
+      #:if defined('GFORTRAN_PR110877')
+         allocate(cx%an, SOURCE=angular_ct(md_p, os_p))
+      #:else
+         cx%an = angular_ct(md_p, os_p)
+      #:endif
 
       select type(an => cx%an)
       class is(sph_angular_ct)
