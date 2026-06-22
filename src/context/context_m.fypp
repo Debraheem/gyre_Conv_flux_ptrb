@@ -91,7 +91,7 @@ module context_m
       procedure, public  :: model
       procedure, public  :: point_i
       procedure, public  :: point_o
-      #:for N in ('lambda', 'l_e', 'eps_rho', 'eps_T')
+      #:for N in ('lambda', 'l_e', 'eps_rho', 'eps_T', 'c_eps_ad', 'c_eps_S')
          #:for S in FLOAT_SUFFIXES
             procedure    :: ${N}$_${S}$_
          #:endfor
@@ -406,8 +406,8 @@ contains
 
    !****
 
-   #:for N in ['eps_rho', 'eps_T']
-      #:for T, S in zip(FLOAT_TYPES, FLOAT_SUFFIXES)
+   #:for T, S in zip(FLOAT_TYPES, FLOAT_SUFFIXES)
+      #:for N in ['eps_rho', 'eps_T']
 
          function ${N}$_${S}$_(this, st, pt) result(${N}$)
 
@@ -465,6 +465,69 @@ contains
          end function ${N}$_${S}$_
 
       #:endfor
+
+      !****
+
+      function c_eps_ad_${S}$_(this, st, pt) result(c_eps_ad)
+
+         class(context_t), intent(in)    :: this
+         class(state_${S}$t), intent(in) :: st
+         type(point_t), intent(in)       :: pt
+         ${T}$                           :: c_eps_ad
+
+         ${T}$    :: eps_rho
+         ${T}$    :: eps_T
+         real(RD) :: c_eps
+         real(RD) :: nabla_ad
+         real(RD) :: Gamma_1
+
+         ! Evaluate the c_eps_ad coefficient
+
+         eps_rho = this%eps_rho(st, pt)
+         eps_T = this%eps_T(st, pt)
+
+         c_eps = this%ml%coeff(I_C_EPS, pt)
+         nabla_ad = this%ml%coeff(I_NABLA_AD, pt)
+         Gamma_1 = this%ml%coeff(I_GAMMA_1, pt)
+
+         c_eps_ad = c_eps*(nabla_ad*eps_T + eps_rho/Gamma_1)
+
+         ! Finish
+
+         return
+
+      end function c_eps_ad_${S}$_
+
+      !****
+
+      function c_eps_S_${S}$_(this, st, pt) result(c_eps_S)
+
+         class(context_t), intent(in)    :: this
+         class(state_${S}$t), intent(in) :: st
+         type(point_t), intent(in)       :: pt
+         ${T}$                           :: c_eps_S
+
+         ${T}$    :: eps_rho
+         ${T}$    :: eps_T
+         real(RD) :: c_eps
+         real(RD) :: ups_T
+
+         ! Evaluate the c_eps_S coefficient
+
+         eps_rho = this%eps_rho(st, pt)
+         eps_T = this%eps_T(st, pt)
+
+         c_eps = this%ml%coeff(I_C_EPS, pt)
+         ups_T = this%ml%coeff(I_UPS_T, pt)
+
+         c_eps_S = c_eps*(eps_T - ups_T*eps_rho)
+
+         ! Finish
+
+         return
+
+      end function c_eps_S_${S}$_
+
    #:endfor
 
    !****

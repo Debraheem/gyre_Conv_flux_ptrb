@@ -171,10 +171,8 @@ contains
       end if
 
       if (cx%epsilon_cache) then
-         eps_rho = cx%eps_rho(state_ct(0._RD), pt)
-         eps_T = cx%eps_T(state_ct(0._RD), pt)
-         de%c_eps_ad = de%c_eps*(de%nabla_ad*eps_T + eps_rho/de%Gamma_1)
-         de%c_eps_S = de%c_eps*(eps_T - de%ups_T*eps_rho)
+         de%c_eps_ad = cx%c_eps_ad(state_ct(0._RD), pt)
+         de%c_eps_S = cx%c_eps_S(state_ct(0._RD), pt)
       end if
 
       ! Other initializations
@@ -233,8 +231,6 @@ contains
       complex(RD) :: eta
       complex(RD) :: f_rht
       complex(RD) :: df_rht
-      complex(RD) :: eps_rho
-      complex(RD) :: eps_T
       complex(RD) :: c_eps_ad
       complex(RD) :: c_eps_S
       real(RD)    :: del_x
@@ -323,10 +319,8 @@ contains
             c_eps_ad = this%c_eps_ad
             c_eps_S = this%c_eps_S
          else
-            eps_rho = this%cx%eps_rho(st, pt)
-            eps_T = this%cx%eps_T(st, pt)
-            c_eps_ad = c_eps*(nabla_ad*eps_T + eps_rho/Gamma_1)
-            c_eps_S = c_eps*(eps_T - ups_T*eps_rho)
+            c_eps_ad = this%cx%c_eps_ad(st, pt)
+            c_eps_S = this%cx%c_eps_S(st, pt)
          end if
 
          del_x = del/x
