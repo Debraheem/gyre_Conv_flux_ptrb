@@ -470,6 +470,9 @@ contains
          #:for N, E in ( &
             ('eps_rho', 'cx%eps_rho(st, gr%pt(j))'), &
             ('eps_T', 'cx%eps_T(st, gr%pt(j))'), &
+            ('c_eps_ad', 'cx%c_eps_ad(st, gr%pt(j))'), &
+            ('c_eps_S', 'cx%c_eps_S(st, gr%pt(j))'), &
+            ('c_trb', 'cx%c_trb(st, gr%pt(j))'), &
             ('Omega_rot', 'cx%Omega_rot(gr%pt(j))'))
             case ('${N}$')
                call wr%write('${N}$', [(${E}$, j=1,gr%n)])

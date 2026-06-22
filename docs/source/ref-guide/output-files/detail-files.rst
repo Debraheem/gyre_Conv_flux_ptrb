@@ -702,22 +702,43 @@ Stellar Structure
    Structure coefficient :math:`\ceps`; defined in
    :ref:`osc-struct-coeffs` section\ [#only-N]_
 
+.. ofile:field:: c_eps_ad
+   :type: complex
+   :dim: :ofile:field:`n`
+
+   Structure coefficient :math:`\cepsad`; defined in
+   :ref:`osc-struct-coeffs` section\ [#only-N]_
+
+.. ofile:field:: c_eps_S
+   :type: complex
+   :dim: :ofile:field:`n`
+
+   Structure coefficient :math:`\cepsS`; defined in
+   :ref:`osc-struct-coeffs` section\ [#only-N]_
+
 .. ofile:field:: c_egv
-   :type: real
+   :type: complex
    :dim: :ofile:field:`n`
 
    Structure coefficient :math:`\cegv`; defined in
    :ref:`osc-struct-coeffs` section\ [#only-N]_
 
-.. ofile:field:: eps_rho
+.. ofile:field:: c_trb
    :type: real
+   :dim: :ofile:field:`n`
+
+   Structure coefficient :math:`\ctrb \equiv (\nu/gr) \sqrt{G\Mstar/\Rstar^{3}}`,
+   where :math:`\nu` is the turbulent viscosity defined in the :ref:`osc-conv-turb` section
+
+.. ofile:field:: eps_rho
+   :type: complex
    :dim: :ofile:field:`n`
 
    Nuclear energy generation partial :math:`\epsnucrho`; defined in
    :ref:`osc-linear-eqns` section\ [#only-N]_
 
 .. ofile:field:: eps_T
-   :type: real
+   :type: complex
    :dim: :ofile:field:`n`
 
    Nuclear energy generation partial :math:`\epsnucT`; defined in

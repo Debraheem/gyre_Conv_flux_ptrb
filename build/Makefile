@@ -177,7 +177,7 @@ libgyre_SRCS = \
    string_m.fypp summary_m.fypp 							\
    tar_eigen_m.fypp tar_fit_m.fypp tar_angular_m.fypp tidal_coeff_m.fypp		\
    tidal_resp_m.fypp tidal_context_m.fypp tide_par_m.fypp trans_m.fypp			\
-   turb_m.fypp txt_writer_m.fypp util_m.fypp version_m.fypp		\
+   txt_writer_m.fypp util_m.fypp version_m.fypp						\
    wave_m.fypp wdec_file_m.fypp writer_m.fypp
 
 libgyre_mesa_SRCS = gyre_mesa_m.fypp
