@@ -96,6 +96,51 @@ A = sp.Matrix([
 
 r = generate_tidal_r(A)
 
+# Differential Jacobian matrix with turbulent drag term. This is
+# formed from the non-adiabatic matrix with a turbulent correction to
+# the radial momentum equation:
+#
+#  x dy/dx = A y + G y_trb - x d/dx(y_trb) + r_nad
+#
+# with
+#
+#  G = As + V_g - U + 1 - l
+#
+# and
+#
+#  y_trb = F_trb [x dy_1/dx + (l-1) y_1] e_2
+#
+# where e_2 is the basis vector associated with the radial momentum
+# equation, and F_trb = i omega nu_trb / (g r).
+#
+# Introducing the intermediate matrix H so that y_trb = H y, we rewrite
+# the differential equations as
+#
+#  x dz/dx = A_trb z + r
+#
+# where
+#
+#   z = y + y_trb
+#   A_trb = (A_nad + G H) Q
+#   Q = (I + H)^-1
+#
+# After z is found, y can be reconstructed as y = Q z
+
+G = As + V_g - U(x) + 1 - l_i
+
+H = F_trb * sp.Matrix([
+    [0, 0, 0, 0, 0, 0],
+    [A[0,0] + l_i - 1, A[0,1], A[0,2], A[0,3], A[0,4], A[0,5]],
+    [0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0]
+    ])
+
+Q = sp.Inverse(sp.eye(6) + H)
+
+A_trb = (A + G*H) @ Q
+
 # Inner boundary condition matrices and inhomogeneous vectors
 
 IB_regular = sp.Matrix([
@@ -255,6 +300,9 @@ if __name__ == '__main__':
         with open(f'{vars}/A.inc', 'w') as file:
             file.write(generate_A(A, r, T)+'\n')
 
+        with open(f'{vars}/A_trb.inc', 'w') as file:
+            file.write(generate_A(A_trb, r, T)+'\n')
+
         with open(f'{vars}/IB_regular.inc', 'w') as file:
             file.write(generate_IB(IB_regular, Is_regular, T)+'\n')
 
@@ -287,3 +335,6 @@ if __name__ == '__main__':
 
         with open(f'{vars}/R.inc', 'w') as file:
             file.write(generate_R(T)+'\n')
+
+        with open(f'{vars}/Q.inc', 'w') as f:
+            f.write(generate(Q, 'Q')+'\n')

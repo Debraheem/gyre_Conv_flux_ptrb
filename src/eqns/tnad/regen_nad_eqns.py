@@ -1,1 +1,0 @@
-../nad/regen_nad_eqns.py

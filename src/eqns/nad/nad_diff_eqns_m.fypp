@@ -34,6 +34,7 @@ module ${P}$_nad_diff_eqns_m
    use osc_par_m
    use point_m
    use state_m
+   use turb_m
 
    use ISO_FORTRAN_ENV
 
@@ -237,6 +238,7 @@ contains
       complex(RD) :: c_eps_ad
       complex(RD) :: c_eps_S
       real(RD)    :: del_x
+      complex(RD) :: F_trb
 
       if (PRESENT(trans)) then
          trans_ = trans
@@ -291,6 +293,8 @@ contains
          alpha_gam => this%cx%alpha_gam, &
          alpha_pi => this%cx%alpha_pi, &
          alpha_egv => this%cx%alpha_egv, &
+         alpha_trb => this%cx%alpha_trb, &
+         alpha_con => this%cx%alpha_con, &
          m => this%cx%m, &
          angular_cache => this%cx%angular_cache, &
          epsilon_cache => this%cx%epsilon_cache)
@@ -327,7 +331,12 @@ contains
 
          del_x = del/x
 
-         #:include 'A.inc'
+         if (alpha_trb > 0._RD) then
+            F_trb = i_omega_c*c_trb(V, As, c_1, alpha_trb, alpha_con, REAL(omega, RD))
+            #:include 'A_trb.inc'
+         else
+            #:include 'A.inc'
+         end if
 
       end associate
 

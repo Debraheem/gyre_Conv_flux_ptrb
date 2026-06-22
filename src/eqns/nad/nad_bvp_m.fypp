@@ -26,10 +26,11 @@ module nad_bvp_m
    use bvp_m
    use context_m
    use diff_eqns_m
-   use ext_m
    use grid_m
    use mode_m
    use mode_par_m
+   use model_m
+   use model_util_m
    use num_par_m
    use orbit_par_m
    use osc_par_m
@@ -38,6 +39,7 @@ module nad_bvp_m
    use state_m
    use sysmtx_m
    use trans_m
+   use turb_m
    use wave_m
 
    use ISO_FORTRAN_ENV
@@ -52,6 +54,12 @@ module nad_bvp_m
       private
       type(context_t), pointer     :: cx => null()
       class(trans_ct), allocatable :: tr(:)
+      real(RD), allocatable        :: V(:)
+      real(RD), allocatable        :: V_g(:)
+      real(RD), allocatable        :: As(:)
+      real(RD), allocatable        :: c_1(:)
+      real(RD), allocatable        :: ups_T(:)
+      real(RD), allocatable        :: Omega_rot(:)
       type(grid_t)                 :: gr
       type(mode_par_t)             :: md_p
       type(num_par_t)              :: nm_p
@@ -98,6 +106,8 @@ contains
 
       class(bound_conds_ct), allocatable :: bc_i
       class(bound_conds_ct), allocatable :: bc_o
+      class(model_t), pointer            :: ml
+      integer                            :: j
 
       ! Construct the nad_bvp type
 
@@ -107,6 +117,40 @@ contains
       bc_o = nad_obound_conds_t(cx, os_p)
 
       bp%bvp_ct = bvp_ct(gr, bc_i, bc_o, diff_eqns_factory_, match_conds_factory_, nm_p)
+
+      ! Store coefficients needed to evaluate y_trb
+
+      if (os_p%alpha_trb > 0._RD) then
+
+         ml => cx%model()
+
+         call check_model(ml, [I_V_2,I_AS,I_C_1,I_GAMMA_1,I_UPS_T])
+
+         allocate(bp%V(gr%n))
+         allocate(bp%V_g(gr%n))
+         allocate(bp%As(gr%n))
+         allocate(bp%c_1(gr%n))
+         allocate(bp%ups_T(gr%n))
+         allocate(bp%Omega_rot(gr%n))
+
+         !$OMP PARALLEL DO
+         do j = 1, gr%n
+
+            associate(pt => gr%pt(j))
+
+               bp%V(j) = ml%coeff(I_V_2, pt)*pt%x**2
+               bp%V_g(j) = bp%V(j)/ml%coeff(I_GAMMA_1, pt)
+               bp%As(j) = ml%coeff(I_AS, pt)
+               bp%c_1(j) = ml%coeff(I_C_1, pt)
+               bp%ups_T(j) = ml%coeff(I_UPS_T, pt)
+
+               bp%Omega_rot(j) = ml%coeff(I_OMEGA_ROT, pt)
+
+            end associate
+
+         end do
+
+      end if
 
       ! Other initializations
 
@@ -187,6 +231,7 @@ contains
 
       complex(RD)  :: y(6,bp%n)
       integer      :: j
+      complex(RD)  :: Q(6,6)
       type(wave_t) :: wv
 
       ! Calculate the homogeneous solution vector
@@ -197,6 +242,18 @@ contains
       do j = 1, bp%n
          call bp%tr(j)%transform(st, y(:,j))
       end do
+
+      ! Subtract off the turbulent pressure
+
+      if (bp%cx%alpha_trb > 0._RD) then
+
+         !$OMP PARALLEL DO PRIVATE(Q)
+         do j = 1, bp%n
+            call eval_Q_(bp, st, j, Q)
+            y(:,j) = MATMUL(Q, y(:,j))
+         end do
+
+      end if
 
       ! Construct the mode_t
 
@@ -224,6 +281,7 @@ contains
 
       complex(RD)  :: y(6,bp%n)
       integer      :: j
+      complex(RD)  :: Q(6,6)
       type(wave_t) :: wv
 
       ! Calculate the inhomogeneous solution vector
@@ -234,6 +292,18 @@ contains
       do j = 1, bp%n
          call bp%tr(j)%transform(st, y(:,j))
       end do
+
+      ! Subtract off the turbulent pressure
+
+      if (bp%cx%alpha_trb > 0._RD) then
+
+         !$OMP PARALLEL DO PRIVATE(Q)
+         do j = 1, bp%n
+            call eval_Q_(bp, st, j, Q)
+            y(:,j) = MATMUL(Q, y(:,j))
+         end do
+
+      end if
 
       ! Construct the resp_t
 
@@ -246,5 +316,67 @@ contains
       return
 
    end function resp_t_
+
+   !****
+
+   subroutine eval_Q_(bp, st, j, Q)
+
+      class(nad_bvp_t), intent(in) :: bp
+      type(state_ct), intent(in)   :: st
+      integer, intent(in)          :: j
+      complex(RD), intent(out)     :: Q(:,:)
+
+      complex(RD) :: omega_c
+      complex(RD) :: i_omega_c
+      complex(RD) :: lambda
+      complex(RD) :: l_i
+      complex(RD) :: om2
+      complex(RD) :: eta
+      complex(RD) :: F_trb
+
+      @:CHECK_BOUNDS(SIZE(Q, 1), bp%n_e)
+      @:CHECK_BOUNDS(SIZE(Q, 1), bp%n_e)
+
+      ! Evaluate the Q matrix
+
+      associate( &
+         omega => st%omega, &
+         V => bp%V(j), &
+         V_g => bp%V_g(j), &
+         As => bp%As(j), &
+         c_1 => bp%c_1(j), &
+         ups_T => bp%ups_T(j), &
+         Omega_rot => bp%Omega_rot(j), &
+         Omega_rot_i => bp%cx%Omega_rot_i, &
+         alpha_grv => bp%cx%alpha_grv, &
+         alpha_omg => bp%cx%alpha_omg, &
+         alpha_gam => bp%cx%alpha_gam, &
+         alpha_trb => bp%cx%alpha_trb, &
+         alpha_con => bp%cx%alpha_con, &
+         m => bp%cx%m)
+
+         omega_c = omega - m*Omega_rot
+
+         i_omega_c = (0._RD,1._RD)*sqrt(CMPLX(alpha_omg, KIND=RD))*omega_c
+
+         lambda = bp%cx%lambda(Omega_rot, st)
+         l_i = bp%cx%l_e(Omega_rot_i, st)
+
+         om2 = c_1*alpha_omg*omega_c**2
+         eta = lambda/om2
+
+         F_trb = i_omega_c*c_trb(V, As, c_1, alpha_trb, alpha_con, REAL(omega_c, RD))
+
+         ! Set upt the Q matrix
+
+         #:include 'Q.inc'
+
+      end associate
+
+      ! Finish
+
+      return
+
+   end subroutine eval_Q_
 
 end module nad_bvp_m
