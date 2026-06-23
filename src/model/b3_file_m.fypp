@@ -37,9 +37,15 @@ module b3_file_m
 
    implicit none (type, external)
 
+   ! Interfaces
+
+   interface b3_model_t
+      module procedure b3_model_t_file_
+   end interface b3_model_t
+
    ! Access specifiers
 
-   public :: read_b3_model
+   public :: b3_model_t
 
    ! Default access
 
@@ -47,10 +53,10 @@ module b3_file_m
 
 contains
 
-   subroutine read_b3_model(ml_p, ml)
+   function b3_model_t_file_(ml_p) result(ml)
 
-      type(model_par_t), intent(in)        :: ml_p
-      class(model_t), pointer, intent(out) :: ml
+      type(model_par_t), intent(in) :: ml_p
+      type(evol_model_t)            :: ml
 
       type(hdf5io_t)              :: hi
       integer                     :: n
@@ -91,7 +97,6 @@ contains
       real(RD), allocatable       :: c_thk(:)
       real(RD), allocatable       :: c_eps(:)
       real(RD), allocatable       :: Omega_rot(:)
-      type(evol_model_t), pointer :: em
 
       ! Open the B3-format file
 
@@ -199,42 +204,34 @@ contains
 
       ! Initialize the evol_model_t
 
-      #:if defined('GFORTRAN_PR110877')
-         allocate(em, SOURCE=evol_model_t(x, M_star, R_star, L_star, ml_p))
-      #:else
-         em = evol_model_t(x, M_star, R_star, L_star, ml_p)
-      #:endif
+      ml = evol_model_t(x, M_star, R_star, L_star, ml_p)
 
-      call em%define(I_V_2, V_2)
-      call em%define(I_AS, As)
-      call em%define(I_U, U)
-      call em%define(I_C_1, c_1)
+      call ml%define(I_V_2, V_2)
+      call ml%define(I_AS, As)
+      call ml%define(I_U, U)
+      call ml%define(I_C_1, c_1)
 
-      call em%define(I_GAMMA_1, Gamma_1)
-      call em%define(I_UPS_T, ups_T)
-      call em%define(I_NABLA_AD, nabla_ad)
-      call em%define(I_NABLA, nabla)
-      call em%define(I_BETA_RAD, beta_rad)
+      call ml%define(I_GAMMA_1, Gamma_1)
+      call ml%define(I_UPS_T, ups_T)
+      call ml%define(I_NABLA_AD, nabla_ad)
+      call ml%define(I_NABLA, nabla)
+      call ml%define(I_BETA_RAD, beta_rad)
 
-      call em%define(I_C_LUM, c_lum)
-      call em%define(I_C_RAD, c_rad)
-      call em%define(I_C_THN, c_thn)
-      call em%define(I_C_THK, c_thk)
-      call em%define(I_C_EPS, c_eps)
+      call ml%define(I_C_LUM, c_lum)
+      call ml%define(I_C_RAD, c_rad)
+      call ml%define(I_C_THN, c_thn)
+      call ml%define(I_C_THK, c_thk)
+      call ml%define(I_C_EPS, c_eps)
 
-      call em%define(I_EPS_RHO, eps_rho)
-      call em%define(I_EPS_T, eps_T)
+      call ml%define(I_EPS_RHO, eps_rho)
+      call ml%define(I_EPS_T, eps_T)
 
-      call em%define(I_KAP_RHO, kap_rho)
-      call em%define(I_KAP_T, kap_T)
+      call ml%define(I_KAP_RHO, kap_rho)
+      call ml%define(I_KAP_T, kap_T)
 
-      call em%define(I_OMEGA_ROT, Omega_rot)
+      call ml%define(I_OMEGA_ROT, Omega_rot)
 
-      call em%commit()
-
-      ! Return a pointer
-
-      ml => em
+      call ml%commit()
 
       if (check_log_level('INFO')) then
          write(OUTPUT_UNIT, *)
@@ -244,6 +241,6 @@ contains
 
       return
 
-   end subroutine read_b3_model
+   end function b3_model_t_file_
 
 end module b3_file_m

@@ -70,7 +70,7 @@ contains
 
 
       type(model_par_t), intent(in) :: ml_p
-      class(model_t), pointer       :: ml
+      class(model_t), allocatable   :: ml
 
       ! Construct the model_t
 
@@ -79,58 +79,58 @@ contains
 
          select case (ml_p%file_format)
          case ('AMDL')
-            call read_amdl_model(ml_p, ml)
+            ml = amdl_model_t(ml_p)
          case ('B3')
-            call read_b3_model(ml_p, ml)
+            ml = b3_model_t(ml_p)
          case ('FAMDL')
-            call read_famdl_model(ml_p, ml)
+            ml = famdl_model_t(ml_p)
          case ('FGONG')
-            call read_fgong_model(ml_p, ml)
+            ml = fgong_model_t(ml_p)
          case ('GSM')
-            call read_gsm_model(ml_p, ml)
+            ml = gsm_model_t(ml_p)
          case ('LOSC')
-            call read_losc_model(ml_p, ml)
+            ml = losc_model_t(ml_p)
          case ('MESA')
-            call read_mesa_model(ml_p, ml)
+            ml = mesa_model_t(ml_p)
          case ('OSC')
-            call read_osc_model(ml_p, ml)
+            ml = osc_model_t(ml_p)
          case ('WDEC')
-            call read_wdec_model(ml_p, ml)
+            ml = wdec_model_t(ml_p)
          case default
             @:ABORT('invalid file_format')
          end select
 
       case ('POLY')
 
-         call read_poly_model(ml_p, ml)
+         ml = poly_model_t(ml_p)
 
       case ('PARFAIT')
 
-         call read_parfait_model(ml_p, ml)
+!         call read_parfait_model(ml_p, ml)
 
       case ('PARFAITD')
 
-         call read_parfaitd_model(ml_p, ml)
+!         call read_parfaitd_model(ml_p, ml)
 
       case ('HOM')
 
-         allocate(ml, SOURCE=hom_model_t(ml_p))
+         ml = hom_model_t(ml_p)
 
       case ('ANAPOLY_0')
 
-         allocate(ml, SOURCE=anapoly_0_model_t(ml_p))
+         ml = anapoly_0_model_t(ml_p)
 
       case ('ANAPOLY_1')
 
-         allocate(ml, SOURCE=anapoly_1_model_t(ml_p))
+         ml = anapoly_1_model_t(ml_p)
 
       case ('ANAPOLY_5')
 
-         allocate(ml, SOURCE=anapoly_5_model_t(ml_p))
+         ml = anapoly_5_model_t(ml_p)
 
       case ('ANAPOLY_5_1')
 
-         allocate(ml, SOURCE=anapoly_5_1_model_t(ml_p))
+         ml = anapoly_5_1_model_t(ml_p)
 
       case default
 

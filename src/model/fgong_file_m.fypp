@@ -38,9 +38,15 @@ module fgong_file_m
 
    implicit none (type, external)
 
+   ! Interfaces
+
+   interface fgong_model_t
+      module procedure fgong_model_t_file_
+   end interface fgong_model_t
+
    ! Access specifiers
 
-   public :: read_fgong_model
+   public :: fgong_model_t
 
    ! Default access
 
@@ -48,10 +54,10 @@ module fgong_file_m
 
 contains
 
-   subroutine read_fgong_model(ml_p, ml)
+   function fgong_model_t_file_(ml_p) result(ml)
 
-      type(model_par_t), intent(in)        :: ml_p
-      class(model_t), pointer, intent(out) :: ml
+      type(model_par_t), intent(in) :: ml_p
+      type(evol_model_t)            :: ml
 
       integer                     :: unit
       integer                     :: n
@@ -79,7 +85,6 @@ contains
       real(RD), allocatable       :: U(:)
       real(RD), allocatable       :: c_1(:)
       real(RD), allocatable       :: Omega_rot(:)
-      type(evol_model_t), pointer :: em
 
       ! Open the FGONG-format file
 
@@ -193,30 +198,22 @@ contains
 
       ! Initialize the evol_model_t
 
-      #:if defined('GFORTRAN_PR110877')
-         allocate(em, SOURCE=evol_model_t(x, M_star, R_star, L_star, ml_p))
-      #:else
-         em = evol_model_t(x, M_star, R_star, L_star, ml_p)
-      #:endif
+      ml = evol_model_t(x, M_star, R_star, L_star, ml_p)
 
-      call em%define(I_V_2, V_2)
-      call em%define(I_AS, As)
-      call em%define(I_U, U)
-      call em%define(I_C_1, c_1)
+      call ml%define(I_V_2, V_2)
+      call ml%define(I_AS, As)
+      call ml%define(I_U, U)
+      call ml%define(I_C_1, c_1)
 
-      call em%define(I_GAMMA_1, Gamma_1)
-      call em%define(I_UPS_T, ups_T)
-      call em%define(I_NABLA_AD, nabla_ad)
+      call ml%define(I_GAMMA_1, Gamma_1)
+      call ml%define(I_UPS_T, ups_T)
+      call ml%define(I_NABLA_AD, nabla_ad)
 
-      call em%define(I_BETA_RAD, beta_rad)
+      call ml%define(I_BETA_RAD, beta_rad)
 
-      call em%define(I_OMEGA_ROT, Omega_rot)
+      call ml%define(I_OMEGA_ROT, Omega_rot)
 
-      call em%commit()
-
-      ! Return a pointer
-
-      ml => em
+      call ml%commit()
 
       if (check_log_level('INFO')) then
          write(OUTPUT_UNIT, *)
@@ -226,6 +223,6 @@ contains
 
       return
 
-   end subroutine read_fgong_model
+   end function fgong_model_t_file_
 
 end module fgong_file_m

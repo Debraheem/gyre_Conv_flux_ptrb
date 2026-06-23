@@ -30,7 +30,6 @@ module nad_bvp_m
    use mode_m
    use mode_par_m
    use model_m
-   use model_util_m
    use num_par_m
    use orbit_par_m
    use osc_par_m
@@ -92,14 +91,15 @@ contains
    function nad_bvp_t_(cx, gr, md_p, nm_p, os_p) result(bp)
 
       use bound_conds_m
+      use model_util_m
       use nad_factory_m
 
-      class(context_t), pointer, intent(in) :: cx
-      type(grid_t), intent(in)              :: gr
-      type(mode_par_t), intent(in)          :: md_p
-      type(num_par_t), intent(in)           :: nm_p
-      type(osc_par_t), intent(in)           :: os_p
-      type(nad_bvp_t)                       :: bp
+      type(context_t), pointer, intent(in) :: cx
+      type(grid_t), intent(in)             :: gr
+      type(mode_par_t), intent(in)         :: md_p
+      type(num_par_t), intent(in)          :: nm_p
+      type(osc_par_t), intent(in)          :: os_p
+      type(nad_bvp_t)                      :: bp
 
       class(bound_conds_ct), allocatable :: bc_i
       class(bound_conds_ct), allocatable :: bc_o

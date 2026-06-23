@@ -44,23 +44,23 @@ program poly_to_fgong
    character(:), allocatable :: out_file_name
    logical                   :: drop_outer
 
-   type(arg_parser_t)      :: arg_parser
-   type(model_par_t)       :: ml_p
-   class(model_t), pointer :: ml
-   type(grid_t)            :: gr
-   real(RD), allocatable   :: V_2(:)
-   real(RD), allocatable   :: As(:)
-   real(RD), allocatable   :: U(:)
-   real(RD), allocatable   :: c_1(:)
-   real(RD), allocatable   :: Gamma_1(:)
-   real(RD), allocatable   :: M_r(:)
-   real(RD), allocatable   :: P(:)
-   real(RD), allocatable   :: rho(:)
-   integer                 :: n
-   real(RD), allocatable   :: glob(:)
-   real(RD), allocatable   :: var(:,:)
-   integer                 :: unit
-   integer                 :: j
+   type(arg_parser_t)          :: arg_parser
+   type(model_par_t)           :: ml_p
+   class(model_t), allocatable :: ml
+   type(grid_t)                :: gr
+   real(RD), allocatable       :: V_2(:)
+   real(RD), allocatable       :: As(:)
+   real(RD), allocatable       :: U(:)
+   real(RD), allocatable       :: c_1(:)
+   real(RD), allocatable       :: Gamma_1(:)
+   real(RD), allocatable       :: M_r(:)
+   real(RD), allocatable       :: P(:)
+   real(RD), allocatable       :: rho(:)
+   integer                     :: n
+   real(RD), allocatable       :: glob(:)
+   real(RD), allocatable       :: var(:,:)
+   integer                     :: unit
+   integer                     :: j
 
    ! Parse command-line arguments
 
@@ -84,7 +84,7 @@ program poly_to_fgong
 
    ml_p%file = TRIM(in_file_name)
 
-   call read_poly_model(ml_p, ml)
+   ml = poly_model_t(ml_p)
 
    ! Set up the grid
 

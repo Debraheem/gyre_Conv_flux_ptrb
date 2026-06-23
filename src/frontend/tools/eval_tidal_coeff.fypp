@@ -41,13 +41,13 @@ program eval_tidal_coeff
    integer, allocatable      :: m
    integer, allocatable      :: k
 
-   type(arg_parser_t)      :: arg_parser
-   type(model_par_t)       :: ml_p
-   class(model_t), pointer :: ml => null()
-   type(orbit_par_t)       :: or_p
-   real(RD)                :: q
-   real(RD)                :: Omega_orb
-   real(RD)                :: f
+   type(arg_parser_t)          :: arg_parser
+   type(model_par_t)           :: ml_p
+   class(model_t), allocatable :: ml
+   type(orbit_par_t)           :: or_p
+   real(RD)                    :: q
+   real(RD)                    :: Omega_orb
+   real(RD)                    :: f
 
    ! Parse command-line arguments
 
@@ -116,7 +116,7 @@ program eval_tidal_coeff
 
    ml_p = model_par_t()
 
-   ml => model_t(ml_p)
+   ml = model_t(ml_p)
 
    q = 1._RD
    Omega_orb = sqrt(R_a**3*(1._RD + q))

@@ -284,7 +284,7 @@ contains
 
    subroutine check_scan(cx, gr, omega, md_p, os_p)
 
-      class(context_t), intent(in) :: cx
+      type(context_t), intent(in)  :: cx
       type(grid_t), intent(in)     :: gr
       real(RD), intent(inout)      :: omega(:)
       type(mode_par_t), intent(in) :: md_p

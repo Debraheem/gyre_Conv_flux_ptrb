@@ -44,10 +44,16 @@ module mesa_file_m
    integer, parameter :: N_COLS_V1_0X = 18
    integer, parameter :: N_COLS_V1_20 = 19
 
+   ! Interfaces
+
+   interface mesa_model_t
+      module procedure mesa_model_t_file_
+      module procedure mesa_model_t_data_
+   end interface mesa_model_t
+
    ! Access specifiers
 
-   public :: read_mesa_model
-   public :: init_mesa_model
+   public :: mesa_model_t
 
    ! Default access
 
@@ -55,10 +61,10 @@ module mesa_file_m
 
 contains
 
-   subroutine read_mesa_model(ml_p, ml)
+   function mesa_model_t_file_(ml_p) result(ml)
 
-      type(model_par_t), intent(in)        :: ml_p
-      class(model_t), pointer, intent(out) :: ml
+      type(model_par_t), intent(in) :: ml_p
+      type(evol_model_t)            :: ml
 
       integer                     :: unit
       integer                     :: n
@@ -68,7 +74,6 @@ contains
       real(RD), allocatable       :: point_data(:,:)
       integer                     :: k
       integer                     :: k_chk
-      type(evol_model_t), pointer :: em
 
       ! Read data from the MESA-format file
 
@@ -122,31 +127,27 @@ contains
 
       ! Initialize the model
 
-      call init_mesa_model(ml_p, global_data, point_data, version, em)
+      ml = mesa_model_t(ml_p, global_data, point_data, version)
 
       if (check_log_level('INFO')) then
          write(OUTPUT_UNIT, *)
       endif
 
-      ! Return the pointer to the model
-
-      ml => em
-
       ! Finish
 
       return
 
-   end subroutine read_mesa_model
+   end function mesa_model_t_file_
 
    !****
 
-   subroutine init_mesa_model(ml_p, global_data, point_data, version, em)
+   function mesa_model_t_data_(ml_p, global_data, point_data, version) result(ml)
 
-      type(model_par_t), intent(in)            :: ml_p
-      real(RD), intent(in)                     :: global_data(:)
-      real(RD), intent(in)                     :: point_data(:,:)
-      integer, intent(in)                      :: version
-      type(evol_model_t), pointer, intent(out) :: em
+      type(model_par_t), intent(in) :: ml_p
+      real(RD), intent(in)          :: global_data(:)
+      real(RD), intent(in)          :: point_data(:,:)
+      integer, intent(in)           :: version
+      type(evol_model_t)            :: ml
 
       real(RD)                    :: M_star
       real(RD)                    :: R_star
@@ -261,39 +262,35 @@ contains
 
       ! Initialize the evol_model_t
 
-      #:if defined('GFORTRAN_PR110877')
-         allocate(em, SOURCE=evol_model_t(x, M_star, R_star, L_star, ml_p))
-      #:else
-         em = evol_model_t(x, M_star, R_star, L_star, ml_p)
-      #:endif
+      ml = evol_model_t(x, M_star, R_star, L_star, ml_p)
 
-      call em%define(I_V_2, V_2)
-      call em%define(I_AS, As)
-      call em%define(I_U, U)
-      call em%define(I_C_1, c_1)
+      call ml%define(I_V_2, V_2)
+      call ml%define(I_AS, As)
+      call ml%define(I_U, U)
+      call ml%define(I_C_1, c_1)
 
-      call em%define(I_GAMMA_1, Gamma_1)
-      call em%define(I_UPS_T, ups_T)
-      call em%define(I_NABLA_AD, nabla_ad)
-      call em%define(I_NABLA, nabla)
-      call em%define(I_BETA_RAD, beta_rad)
+      call ml%define(I_GAMMA_1, Gamma_1)
+      call ml%define(I_UPS_T, ups_T)
+      call ml%define(I_NABLA_AD, nabla_ad)
+      call ml%define(I_NABLA, nabla)
+      call ml%define(I_BETA_RAD, beta_rad)
 
-      call em%define(I_C_LUM, c_lum)
-      call em%define(I_C_RAD, c_rad)
-      call em%define(I_C_THN, c_thn)
-      call em%define(I_C_THK, c_thk)
-      call em%define(I_C_EPS, c_eps)
-      call em%define(I_C_EGV, c_egv)
+      call ml%define(I_C_LUM, c_lum)
+      call ml%define(I_C_RAD, c_rad)
+      call ml%define(I_C_THN, c_thn)
+      call ml%define(I_C_THK, c_thk)
+      call ml%define(I_C_EPS, c_eps)
+      call ml%define(I_C_EGV, c_egv)
 
-      call em%define(I_EPS_RHO, eps_rho)
-      call em%define(I_EPS_T, eps_T)
+      call ml%define(I_EPS_RHO, eps_rho)
+      call ml%define(I_EPS_T, eps_T)
 
-      call em%define(I_KAP_RHO, kap_rho)
-      call em%define(I_KAP_T, kap_T)
+      call ml%define(I_KAP_RHO, kap_rho)
+      call ml%define(I_KAP_T, kap_T)
 
-      call em%define(I_OMEGA_ROT, Omega_rot)
+      call ml%define(I_OMEGA_ROT, Omega_rot)
 
-      call em%commit()
+      call ml%commit()
 
       ! Finish
 
@@ -512,6 +509,6 @@ contains
 
       end subroutine extract_data_v1_20_
 
-   end subroutine init_mesa_model
+   end function mesa_model_t_data_
 
 end module mesa_file_m

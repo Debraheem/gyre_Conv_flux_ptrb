@@ -453,7 +453,7 @@ contains
 
       character(*), intent(in)       :: item
       type(out_par_t), intent(in)    :: ot_p
-      class(context_t), intent(in)   :: cx
+      type(context_t), intent(in)    :: cx
       type(grid_t), intent(in)       :: gr
       type(state_ct), intent(in)     :: st
       class(writer_t), intent(inout) :: wr

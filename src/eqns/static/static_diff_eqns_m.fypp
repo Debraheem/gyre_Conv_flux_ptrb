@@ -72,9 +72,9 @@ contains
 
    function static_diff_eqns_t_0_(cx, pt) result(de)
 
-      class(context_t), pointer, intent(in) :: cx
-      type(point_t), intent(in)             :: pt
-      type(static_diff_eqns_t)              :: de
+      type(context_t), pointer, intent(in) :: cx
+      type(point_t), intent(in)            :: pt
+      type(static_diff_eqns_t)             :: de
 
       class(model_t), pointer :: ml
 

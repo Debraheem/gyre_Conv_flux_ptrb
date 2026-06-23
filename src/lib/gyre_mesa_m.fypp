@@ -43,7 +43,7 @@ module gyre_mesa_m
    type(orbit_par_t), allocatable, save :: or_p_m(:)
    type(tide_par_t), allocatable, save  :: td_p_m(:)
 
-   class(evol_model_t), pointer, save :: ml_m => null()
+   class(evol_model_t), allocatable, target, save :: ml_m
 
    ! Access specifiers
 
@@ -157,7 +157,7 @@ contains
 
       ! Finalize
 
-      if (ASSOCIATED(ml_m)) deallocate(ml_m)
+      if (ALLOCATED(ml_m)) deallocate(ml_m)
 
       if (ALLOCATED(md_p_m)) deallocate(md_p_m)
       if (ALLOCATED(os_p_m)) deallocate(os_p_m)
@@ -250,18 +250,11 @@ contains
 
       ! Read the model
 
-      if (ASSOCIATED(ml_m)) deallocate(ml_m)
+      if (ALLOCATED(ml_m)) deallocate(ml_m)
 
       ml_p_m%file = file
 
-      call read_mesa_model(ml_p_m, ml)
-
-      select type (ml)
-      class is (evol_model_t)
-         ml_m => ml
-      class default
-         @:ABORT('Invalid class')
-      end select
+      ml_m = mesa_model_t(ml_p_m)
 
       ! Finish
 
@@ -279,9 +272,9 @@ contains
 
       ! Initialize the model
 
-      if (ASSOCIATED(ml_m)) deallocate(ml_m)
+      if (ALLOCATED(ml_m)) deallocate(ml_m)
 
-      call init_mesa_model(ml_p_m, global_data, point_data, version, ml_m)
+      ml_m = mesa_model_t(ml_p_m, global_data, point_data, version)
 
       ! Finsh
 
@@ -329,7 +322,7 @@ contains
       complex(RD), allocatable      :: omega_ad(:)
       integer, allocatable          :: id_ad(:)
 
-      @:ASSERT(ASSOCIATED(ml_m), 'No model provided')
+      @:ASSERT(ALLOCATED(ml_m), 'No model provided')
 
       ! Check that GYRE_DIR is set
 
@@ -399,10 +392,8 @@ contains
             endif
 
             #:if defined('GFORTRAN_PR110877')
-               allocate(em, SOURCE=evol_model_t(x, M_star, R_star, 0._RD, ml_p))
                allocate(sm_ad, SOURCE=sysmtx_rt(bp_ad, nm_p_sel%ad_matrix_solver))
             #:else
-               em = evol_model_t(x, M_star, R_star, 0._RD, ml_p)
                sm_ad = sysmtx_rt(bp_ad, nm_p_sel%ad_matrix_solver)
             #:endif
 
@@ -577,7 +568,7 @@ contains
       type(grid_par_t)  :: gr_p_sel
       type(orbit_par_t) :: or_p_sel
 
-      @:ASSERT(ASSOCIATED(ml_m), 'No model provided')
+      @:ASSERT(ALLOCATED(ml_m), 'No model provided')
 
       ! Check that GYRE_DIR is set
 

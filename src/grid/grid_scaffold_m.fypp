@@ -53,9 +53,9 @@ contains
 
    function grid_t_scaffold_(ml, gr_p) result(gr)
 
-      class(model_t), pointer, intent(in) :: ml
-      type(grid_par_t), intent(in)        :: gr_p
-      type(grid_t)                        :: gr
+      class(model_t), intent(in)   :: ml
+      type(grid_par_t), intent(in) :: gr_p
+      type(grid_t)                 :: gr
 
       ! Create the scaffold grid
 

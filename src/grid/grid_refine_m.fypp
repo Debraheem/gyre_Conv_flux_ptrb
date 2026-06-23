@@ -60,11 +60,11 @@ contains
 
    subroutine refine_grid_context_(gr, cx, omega, gr_p, os_p)
 
-      type(grid_t), intent(inout)          :: gr
-      type(context_t), pointer, intent(in) :: cx
-      real(RD), intent(in)                 :: omega(:)
-      type(grid_par_t), intent(in)         :: gr_p
-      type(osc_par_t), intent(in)          :: os_p
+      type(grid_t), intent(inout)         :: gr
+      type(context_t), target, intent(in) :: cx
+      real(RD), intent(in)                :: omega(:)
+      type(grid_par_t), intent(in)        :: gr_p
+      type(osc_par_t), intent(in)         :: os_p
 
       type(grid_spec_t) :: gs
 

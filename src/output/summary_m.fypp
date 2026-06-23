@@ -489,7 +489,7 @@ contains
    subroutine cache_context_(ot_p, cx, gr, j_ref, sc, cached)
 
       type(out_par_t), intent(in)        :: ot_p
-      class(context_t), intent(in)       :: cx
+      type(context_t), intent(in)        :: cx
       type(grid_t), intent(in)           :: gr
       integer, intent(in)                :: j_ref
       type(summary_col_t), intent(inout) :: sc

@@ -36,25 +36,25 @@ program gyre_tides
 
    ! Variables
 
-   character(:), allocatable      :: filename
-   integer                        :: unit
-   type(model_par_t)              :: ml_p
-   type(osc_par_t), allocatable   :: os_p(:)
-   type(rot_par_t), allocatable   :: rt_p(:)
-   type(num_par_t), allocatable   :: nm_p(:)
-   type(grid_par_t), allocatable  :: gr_p(:)
-   type(orbit_par_t), allocatable :: or_p(:)
-   type(tide_par_t), allocatable  :: td_p(:)
-   type(out_par_t)                :: ot_p
-   class(model_t), pointer        :: ml => null()
-   type(summary_t)                :: sm
-   type(detail_t)                 :: dt
-   integer                        :: i
-   type(osc_par_t)                :: os_p_sel
-   type(rot_par_t)                :: rt_p_sel
-   type(num_par_t)                :: nm_p_sel
-   type(grid_par_t)               :: gr_p_sel
-   type(orbit_par_t)              :: or_p_sel
+   character(:), allocatable           :: filename
+   integer                             :: unit
+   type(model_par_t)                   :: ml_p
+   type(osc_par_t), allocatable        :: os_p(:)
+   type(rot_par_t), allocatable        :: rt_p(:)
+   type(num_par_t), allocatable        :: nm_p(:)
+   type(grid_par_t), allocatable       :: gr_p(:)
+   type(orbit_par_t), allocatable      :: or_p(:)
+   type(tide_par_t), allocatable       :: td_p(:)
+   type(out_par_t)                     :: ot_p
+   class(model_t), allocatable, target :: ml
+   type(summary_t)                     :: sm
+   type(detail_t)                      :: dt
+   integer                             :: i
+   type(osc_par_t)                     :: os_p_sel
+   type(rot_par_t)                     :: rt_p_sel
+   type(num_par_t)                     :: nm_p_sel
+   type(grid_par_t)                    :: gr_p_sel
+   type(orbit_par_t)                   :: or_p_sel
 
    ! Read command-line arguments
 
@@ -117,7 +117,7 @@ program gyre_tides
       write(OUTPUT_UNIT, 100) form_header('Model Init', '-')
    endif
 
-   ml => model_t(ml_p)
+   ml = model_t(ml_p)
 
    ! Initialize the summary and detail outputters
 
@@ -171,10 +171,6 @@ program gyre_tides
    ! Write the summary
 
    call sm%write()
-
-   ! Clean up
-
-   deallocate(ml)
 
    ! Finish
 

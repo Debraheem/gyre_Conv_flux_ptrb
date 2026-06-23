@@ -39,24 +39,24 @@ program eval_love
    character(:), allocatable :: file_format
    integer, allocatable      :: n
 
-   type(arg_parser_t)            :: arg_parser
-   type(model_par_t)             :: ml_p
-   type(osc_par_t)               :: os_p
-   type(rot_par_t)               :: rt_p
-   type(num_par_t)               :: nm_p
-   type(grid_par_t)              :: gr_p
-   type(mode_par_t)              :: md_p
-   type(orbit_par_t)             :: or_p
-   class(model_t), pointer       :: ml => null()
-   type(context_t), pointer      :: cx
-   type(grid_t)                  :: gr
-   type(static_bvp_t)            :: bp
-   class(sysmtx_rt), allocatable :: sm
-   type(state_rt)                :: st
-   real(RD)                      :: A
-   real(RD)                      :: B
-   type(resp_t)                  :: rs
-   real(RD)                      :: k_l
+   type(arg_parser_t)                  :: arg_parser
+   type(model_par_t)                   :: ml_p
+   type(osc_par_t)                     :: os_p
+   type(rot_par_t)                     :: rt_p
+   type(num_par_t)                     :: nm_p
+   type(grid_par_t)                    :: gr_p
+   type(mode_par_t)                    :: md_p
+   type(orbit_par_t)                   :: or_p
+   class(model_t), allocatable, target :: ml
+   type(context_t), target             :: cx
+   type(grid_t)                        :: gr
+   type(static_bvp_t)                  :: bp
+   class(sysmtx_rt), allocatable       :: sm
+   type(state_rt)                      :: st
+   real(RD)                            :: A
+   real(RD)                            :: B
+   type(resp_t)                        :: rs
+   real(RD)                            :: k_l
 
    type(out_par_t) :: ot_p
    type(detail_t)  :: dt
@@ -145,15 +145,13 @@ program eval_love
 
    ! Initialize the model
 
-   ml => model_t(ml_p)
+   ml = model_t(ml_p)
 
    ! Set up the scaffold grid
 
    gr = grid_t(ml, gr_p)
 
    ! Set up the context
-
-   allocate(cx)
 
    cx = context_t(ml, gr, md_p, os_p, rt_p)
 

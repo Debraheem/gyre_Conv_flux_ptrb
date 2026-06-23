@@ -96,25 +96,25 @@ contains
       type(rot_par_t), intent(in)   :: rt_p
       type(tide_par_t), intent(in)  :: td_p
 
-      real(RD), allocatable         :: omega(:)
-      type(grid_t)                  :: gr
-      type(mode_par_t), allocatable :: md_p(:,:)
-      type(context_t), pointer      :: cx(:,:)
-      real(RD), allocatable         :: y_T(:,:,:)
-      integer, allocatable          :: tide_type(:,:,:)
-      integer                       :: c_beg
-      integer                       :: c_end
-      integer                       :: c_rate
-      integer                       :: l
-      integer                       :: m
-      integer                       :: k
-      type(nad_bvp_t)               :: bp_dyn
-      type(static_bvp_t)            :: bp_stat
-      class(sysmtx_ct), allocatable :: sm_dyn
-      class(sysmtx_rt), allocatable :: sm_stat
-      type(state_ct)                :: st_dyn
-      type(state_rt)                :: st_stat
-      type(resp_t)                  :: rs
+      real(RD), allocatable                :: omega(:)
+      type(grid_t)                         :: gr
+      type(mode_par_t), allocatable        :: md_p(:,:)
+      type(context_t), allocatable, target :: cx(:,:)
+      real(RD), allocatable                :: y_T(:,:,:)
+      integer, allocatable                 :: tide_type(:,:,:)
+      integer                              :: c_beg
+      integer                              :: c_end
+      integer                              :: c_rate
+      integer                              :: l
+      integer                              :: m
+      integer                              :: k
+      type(nad_bvp_t)                      :: bp_dyn
+      type(static_bvp_t)                   :: bp_stat
+      class(sysmtx_ct), allocatable        :: sm_dyn
+      class(sysmtx_rt), allocatable        :: sm_stat
+      type(state_ct)                       :: st_dyn
+      type(state_rt)                       :: st_stat
+      type(resp_t)                         :: rs
 
       ! Check that the SPH lambda method is being used
 
@@ -209,10 +209,6 @@ contains
 110      format(2X,A,1X,F10.3,1X,A/)
       end if
 
-      ! Clean up
-
-      deallocate(cx)
-
       ! Finish
 
       return
@@ -224,18 +220,18 @@ contains
    subroutine setup_tides_(ml, gr_p, or_p, os_p, rt_p, td_p, &
       omega, gr, cx, md_p, y_T, tide_type)
 
-      class(model_t), pointer, intent(in)        :: ml
-      type(grid_par_t), intent(in)               :: gr_p
-      type(orbit_par_t), intent(in)              :: or_p
-      type(osc_par_t), intent(in)                :: os_p
-      type(rot_par_t), intent(in)                :: rt_p
-      type(tide_par_t), intent(in)               :: td_p
-      real(RD), allocatable, intent(out)         :: omega(:)
-      type(grid_t), intent(out)                  :: gr
-      type(context_t), pointer, intent(out)      :: cx(:,:)
-      type(mode_par_t), allocatable, intent(out) :: md_p(:,:)
-      real(RD), allocatable, intent(out)         :: y_T(:,:,:)
-      integer, allocatable, intent(out)          :: tide_type(:,:,:)
+      class(model_t), pointer, intent(in)               :: ml
+      type(grid_par_t), intent(in)                      :: gr_p
+      type(orbit_par_t), intent(in)                     :: or_p
+      type(osc_par_t), intent(in)                       :: os_p
+      type(rot_par_t), intent(in)                       :: rt_p
+      type(tide_par_t), intent(in)                      :: td_p
+      real(RD), allocatable, intent(out)                :: omega(:)
+      type(grid_t), intent(out)                         :: gr
+      type(context_t), allocatable, target, intent(out) :: cx(:,:)
+      type(mode_par_t), allocatable, intent(out)        :: md_p(:,:)
+      real(RD), allocatable, intent(out)                :: y_T(:,:,:)
+      integer, allocatable, intent(out)                 :: tide_type(:,:,:)
 
       type(point_t)                  :: pt_o
       integer                        :: l_min

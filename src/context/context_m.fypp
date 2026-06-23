@@ -607,10 +607,10 @@ contains
 
    subroutine read_deps_(ml, os_p, ci_eps_rho, ci_eps_T)
 
-      class(model_t), pointer, intent(in) :: ml
-      type(osc_par_t), intent(in)         :: os_p
-      type(cubic_interp_ct), intent(out)  :: ci_eps_rho
-      type(cubic_interp_ct), intent(out)  :: ci_eps_T
+      class(model_t), intent(in)         :: ml
+      type(osc_par_t), intent(in)        :: os_p
+      type(cubic_interp_ct), intent(out) :: ci_eps_rho
+      type(cubic_interp_ct), intent(out) :: ci_eps_T
 
       ! Read epsilon partials data from a file
 
@@ -631,12 +631,10 @@ contains
 
    subroutine read_deps_wolf_(ml, os_p, ci_eps_rho, ci_eps_T)
 
-      use evol_model_m
-
-      class(model_t), pointer, intent(in) :: ml
-      type(osc_par_t), intent(in)         :: os_p
-      type(cubic_interp_ct), intent(out)  :: ci_eps_rho
-      type(cubic_interp_ct), intent(out)  :: ci_eps_T
+      class(model_t), intent(in)         :: ml
+      type(osc_par_t), intent(in)        :: os_p
+      type(cubic_interp_ct), intent(out) :: ci_eps_rho
+      type(cubic_interp_ct), intent(out) :: ci_eps_T
 
       real(RD), allocatable    :: data(:,:)
       real(RD), allocatable    :: omega(:)

@@ -74,9 +74,9 @@ contains
 
    function ${P}$_rad_diff_eqns_t_0_(cx, pt) result(de)
 
-      class(context_t), pointer, intent(in) :: cx
-      type(point_t), intent(in)             :: pt
-      type(${P}$_rad_diff_eqns_t)           :: de
+      type(context_t), pointer, intent(in) :: cx
+      type(point_t), intent(in)            :: pt
+      type(${P}$_rad_diff_eqns_t)          :: de
 
       class(model_t), pointer :: ml
 
@@ -115,9 +115,9 @@ contains
 
    function ${P}$_rad_diff_eqns_t_1_(cx, pt) result(de)
 
-      class(context_t), pointer, intent(in) :: cx
-      type(point_t), intent(in)             :: pt(:)
-      type(${P}$_rad_diff_eqns_t)           :: de(SIZE(pt))
+      type(context_t), pointer, intent(in) :: cx
+      type(point_t), intent(in)            :: pt(:)
+      type(${P}$_rad_diff_eqns_t)          :: de(SIZE(pt))
 
       integer :: j
 

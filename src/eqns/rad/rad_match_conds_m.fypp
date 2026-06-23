@@ -72,9 +72,9 @@ contains
 
    function ${P}$_rad_match_conds_t_0_(cx, pt) result(mc)
 
-      class(context_t), pointer, intent(in) :: cx
-      type(point_t), intent(in)             :: pt
-      type(${P}$_rad_match_conds_t)         :: mc
+      type(context_t), pointer, intent(in) :: cx
+      type(point_t), intent(in)            :: pt
+      type(${P}$_rad_match_conds_t)        :: mc
 
       class(model_t), pointer :: ml
 

@@ -37,9 +37,15 @@ module famdl_file_m
 
    implicit none (type, external)
 
+   ! Interfaces
+
+   interface famdl_model_t
+      module procedure famdl_model_t_file_
+   end interface famdl_model_t
+
    ! Access specifiers
 
-   public :: read_famdl_model
+   public :: famdl_model_t
 
    ! Default access
 
@@ -47,10 +53,10 @@ module famdl_file_m
 
 contains
 
-   subroutine read_famdl_model(ml_p, ml)
+   function famdl_model_t_file_(ml_p) result(ml)
 
-      type(model_par_t), intent(in)        :: ml_p
-      class(model_t), pointer, intent(out) :: ml
+      type(model_par_t), intent(in) :: ml_p
+      type(evol_model_t)            :: ml
 
       character(:), allocatable   :: data_format
       integer                     :: unit
@@ -71,7 +77,6 @@ contains
       real(RD), allocatable       :: U(:)
       real(RD), allocatable       :: V_2(:)
       real(RD), allocatable       :: Omega_rot(:)
-      type(evol_model_t), pointer :: em
 
       ! Open the AMDL-format file
 
@@ -144,26 +149,18 @@ contains
 
       ! Initialize the evol_model_t
 
-      #:if defined('GFORTRAN_PR110877')
-         allocate(em, SOURCE=evol_model_t(x, M_star, R_star, 0._RD, ml_p))
-      #:else
-         em = evol_model_t(x, M_star, R_star, 0._RD, ml_p)
-      #:endif
+      ml = evol_model_t(x, M_star, R_star, 0._RD, ml_p)
 
-      call em%define(I_V_2, V_2)
-      call em%define(I_AS, As)
-      call em%define(I_U, U)
-      call em%define(I_C_1, c_1)
+      call ml%define(I_V_2, V_2)
+      call ml%define(I_AS, As)
+      call ml%define(I_U, U)
+      call ml%define(I_C_1, c_1)
 
-      call em%define(I_GAMMA_1, Gamma_1)
+      call ml%define(I_GAMMA_1, Gamma_1)
 
-      call em%define(I_OMEGA_ROT, Omega_rot)
+      call ml%define(I_OMEGA_ROT, Omega_rot)
 
-      call em%commit()
-
-      ! Return a pointer
-
-      ml => em
+      call ml%commit()
 
       if (check_log_level('INFO')) then
          write(OUTPUT_UNIT, *)
@@ -173,6 +170,6 @@ contains
 
       return
 
-   end subroutine read_famdl_model
+   end function famdl_model_t_file_
 
 end module famdl_file_m

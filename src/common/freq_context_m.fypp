@@ -64,7 +64,7 @@ contains
    function freq_scale_context_(units, cx, md_p, os_p) result(scale)
 
       character(*), intent(in)     :: units
-      class(context_t), intent(in) :: cx
+      type(context_t), intent(in)  :: cx
       type(mode_par_t), intent(in) :: md_p
       type(osc_par_t), intent(in)  :: os_p
       real(RD)                     :: scale
@@ -146,7 +146,7 @@ contains
    function freq_shift_context_(frame, cx, md_p) result(shift)
 
       character(*), intent(in)     :: frame
-      class(context_t), intent(in) :: cx
+      type(context_t), intent(in)  :: cx
       type(mode_par_t), intent(in) :: md_p
       real(RD)                     :: shift
 

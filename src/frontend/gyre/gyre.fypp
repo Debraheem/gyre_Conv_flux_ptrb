@@ -38,42 +38,42 @@ program gyre
 
    character(:), allocatable     :: filename
 
-   integer                       :: unit
-   type(model_par_t)             :: ml_p
-   type(mode_par_t), allocatable :: md_p(:)
-   type(osc_par_t), allocatable  :: os_p(:)
-   type(rot_par_t), allocatable  :: rt_p(:)
-   type(num_par_t), allocatable  :: nm_p(:)
-   type(grid_par_t), allocatable :: gr_p(:)
-   type(scan_par_t), allocatable :: sc_p(:)
-   type(out_par_t)               :: ot_p_ad
-   type(out_par_t)               :: ot_p_nad
-   class(model_t), pointer       :: ml => null()
-   integer                       :: i
-   type(osc_par_t)               :: os_p_sel
-   type(rot_par_t)               :: rt_p_sel
-   type(num_par_t)               :: nm_p_sel
-   type(grid_par_t)              :: gr_p_sel
-   type(scan_par_t), allocatable :: sc_p_sel(:)
-   type(context_t), pointer      :: cx => null()
-   type(summary_t)               :: su_ad
-   type(summary_t)               :: su_nad
-   type(detail_t)                :: dt_ad
-   type(detail_t)                :: dt_nad
-   real(RD), allocatable         :: omega_re(:)
-   real(RD), allocatable         :: omega_im(:)
-   real(RD)                      :: omega_min
-   real(RD)                      :: omega_max
-   type(grid_t)                  :: gr
-   class(bvp_rt), allocatable    :: bp_ad
-   class(bvp_ct), allocatable    :: bp_nad
-   class(sysmtx_rt), allocatable :: sm_ad
-   class(sysmtx_ct), allocatable :: sm_nad
-   integer                       :: n_ad
-   integer                       :: d_ad
-   complex(RD), allocatable      :: omega_ad(:)
-   integer, allocatable          :: id_ad(:)
-   integer, allocatable          :: j(:)
+   integer                             :: unit
+   type(model_par_t)                   :: ml_p
+   type(mode_par_t), allocatable       :: md_p(:)
+   type(osc_par_t), allocatable        :: os_p(:)
+   type(rot_par_t), allocatable        :: rt_p(:)
+   type(num_par_t), allocatable        :: nm_p(:)
+   type(grid_par_t), allocatable       :: gr_p(:)
+   type(scan_par_t), allocatable       :: sc_p(:)
+   type(out_par_t)                     :: ot_p_ad
+   type(out_par_t)                     :: ot_p_nad
+   class(model_t), allocatable, target :: ml
+   integer                             :: i
+   type(osc_par_t)                     :: os_p_sel
+   type(rot_par_t)                     :: rt_p_sel
+   type(num_par_t)                     :: nm_p_sel
+   type(grid_par_t)                    :: gr_p_sel
+   type(scan_par_t), allocatable       :: sc_p_sel(:)
+   type(context_t), target             :: cx
+   type(summary_t)                     :: su_ad
+   type(summary_t)                     :: su_nad
+   type(detail_t)                      :: dt_ad
+   type(detail_t)                      :: dt_nad
+   real(RD), allocatable               :: omega_re(:)
+   real(RD), allocatable               :: omega_im(:)
+   real(RD)                            :: omega_min
+   real(RD)                            :: omega_max
+   type(grid_t)                        :: gr
+   class(bvp_rt), allocatable          :: bp_ad
+   class(bvp_ct), allocatable          :: bp_nad
+   class(sysmtx_rt), allocatable       :: sm_ad
+   class(sysmtx_ct), allocatable       :: sm_nad
+   integer                             :: n_ad
+   integer                             :: d_ad
+   complex(RD), allocatable            :: omega_ad(:)
+   integer, allocatable                :: id_ad(:)
+   integer, allocatable                :: j(:)
 
    ! Read command-line arguments
 
@@ -135,11 +135,7 @@ program gyre
       write(OUTPUT_UNIT, 100) form_header('Model Init', '-')
    endif
 
-   ml => model_t(ml_p)
-
-   ! Allocate the context (will be initialized later on)
-
-   allocate(cx)
+   ml = model_t(ml_p)
 
    ! Initialize the summary and detail outputters
 
@@ -332,12 +328,6 @@ program gyre
 
    call su_ad%write()
    call su_nad%write()
-
-   ! Clean up
-
-   deallocate(cx)
-
-   deallocate(ml)
 
    ! Finish
 

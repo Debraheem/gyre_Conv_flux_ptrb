@@ -36,37 +36,37 @@ program gyre_map
 
    ! Variables
 
-   character(:), allocatable     :: filename
-   integer                       :: unit
-   type(model_par_t)             :: ml_p
-   type(mode_par_t), allocatable :: md_p(:)
-   type(osc_par_t), allocatable  :: os_p(:)
-   type(num_par_t), allocatable  :: nm_p(:)
-   type(grid_par_t), allocatable :: gr_p(:)
-   type(rot_par_t), allocatable  :: rt_p(:)
-   type(scan_par_t), allocatable :: sc_p(:)
-   character(FILENAME_LEN)       :: map_filename
-   class(model_t), pointer       :: ml => null()
-   type(osc_par_t)               :: os_p_sel
-   type(rot_par_t)               :: rt_p_sel
-   type(num_par_t)               :: nm_p_sel
-   type(grid_par_t)              :: gr_p_sel
-   type(scan_par_t), allocatable :: sc_p_sel(:)
-   type(context_t), pointer      :: cx => null()
-   real(RD), allocatable         :: omega_re(:)
-   real(RD), allocatable         :: omega_im(:)
-   real(RD)                      :: omega_min
-   real(RD)                      :: omega_max
-   type(grid_t)                  :: gr
-   class(bvp_ct), allocatable    :: bp
-   class(sysmtx_ct), allocatable :: sm
-   integer                       :: n_omega_re
-   integer                       :: n_omega_im
-   type(ext_ct), allocatable     :: discrim(:,:)
-   integer                       :: i_re
-   integer                       :: i_im
-   complex(RD)                   :: omega
-   type(hdf5io_t)                :: hi
+   character(:), allocatable           :: filename
+   integer                             :: unit
+   type(model_par_t)                   :: ml_p
+   type(mode_par_t), allocatable       :: md_p(:)
+   type(osc_par_t), allocatable        :: os_p(:)
+   type(num_par_t), allocatable        :: nm_p(:)
+   type(grid_par_t), allocatable       :: gr_p(:)
+   type(rot_par_t), allocatable        :: rt_p(:)
+   type(scan_par_t), allocatable       :: sc_p(:)
+   character(FILENAME_LEN)             :: map_filename
+   class(model_t), allocatable, target :: ml
+   type(osc_par_t)                     :: os_p_sel
+   type(rot_par_t)                     :: rt_p_sel
+   type(num_par_t)                     :: nm_p_sel
+   type(grid_par_t)                    :: gr_p_sel
+   type(scan_par_t), allocatable       :: sc_p_sel(:)
+   type(context_t), target             :: cx
+   real(RD), allocatable               :: omega_re(:)
+   real(RD), allocatable               :: omega_im(:)
+   real(RD)                            :: omega_min
+   real(RD)                            :: omega_max
+   type(grid_t)                        :: gr
+   class(bvp_ct), allocatable          :: bp
+   class(sysmtx_ct), allocatable       :: sm
+   integer                             :: n_omega_re
+   integer                             :: n_omega_im
+   type(ext_ct), allocatable           :: discrim(:,:)
+   integer                             :: i_re
+   integer                             :: i_im
+   complex(RD)                         :: omega
+   type(hdf5io_t)                      :: hi
 
    ! Read command-line arguments
 
@@ -123,11 +123,7 @@ program gyre_map
       write(OUTPUT_UNIT, 100) form_header('Model Init', '-')
    endif
 
-   ml => model_t(ml_p)
-
-   ! Allocate the context (will be initialized later on)
-
-   allocate(cx)
+   ml = model_t(ml_p)
 
    ! Select parameters according to tags
 
@@ -226,12 +222,6 @@ program gyre_map
    call hi%write_dset('discrim_im_e', exponent(discrim%im))
 
    call hi%final()
-
-   ! Clean up
-
-   deallocate(cx)
-
-   deallocate(ml)
 
    ! Finish
 

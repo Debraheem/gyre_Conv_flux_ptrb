@@ -24,7 +24,6 @@ module poly_file_m
    use forum_m, only: RD, hdf5io_t, OPEN_FILE_RO
 
    use constants_m
-   use evol_model_m
    use grid_m
    use model_m
    use model_par_m
@@ -37,9 +36,15 @@ module poly_file_m
 
    implicit none (type, external)
 
+   ! Interfaces
+
+   interface poly_model_t
+      module procedure poly_model_t_file_
+   end interface poly_model_t
+
    ! Access specifiers
 
-   public :: read_poly_model
+   public :: poly_model_t
 
    ! Default access
 
@@ -47,10 +52,10 @@ module poly_file_m
 
 contains
 
-   subroutine read_poly_model(ml_p, ml)
+   function poly_model_t_file_(ml_p) result(ml)
 
-      type(model_par_t), intent(in)        :: ml_p
-      class(model_t), pointer, intent(out) :: ml
+      type(model_par_t), intent(in) :: ml_p
+      type(poly_model_t)            :: ml
 
       type(hdf5io_t)              :: hi
       real(RD), allocatable       :: n_poly(:)
@@ -61,7 +66,6 @@ contains
       real(RD), allocatable       :: theta(:)
       real(RD), allocatable       :: theta_pri(:)
       real(RD)                    :: Omega_rot
-      type(poly_model_t), pointer :: pm
 
       ! Read the POLY-format file
 
@@ -99,17 +103,8 @@ contains
 
       ! Initialize the poly_model_t
 
-      #:if defined('GFORTRAN_PR110877')
-         allocate(pm, SOURCE=poly_model_t(z, theta, theta_pri, n_poly, Delta_b, Gamma_1, Omega_rot, &
-            ml_p%interp_type, ml_p%constrain_derivs))
-      #:else
-         pm = poly_model_t(z, theta, theta_pri, n_poly, Delta_b, Gamma_1, Omega_rot, &
-            ml_p%interp_type, ml_p%constrain_derivs)
-      #:endif
-
-      ! Return a pointer
-
-      ml => pm
+      ml = poly_model_t(z, theta, theta_pri, n_poly, Delta_b, Gamma_1, Omega_rot, &
+         ml_p%interp_type, ml_p%constrain_derivs)
 
       if (check_log_level('INFO')) then
          write(OUTPUT_UNIT, *)
@@ -119,6 +114,6 @@ contains
 
       return
 
-   end subroutine read_poly_model
+   end function poly_model_t_file_
 
 end module poly_file_m
