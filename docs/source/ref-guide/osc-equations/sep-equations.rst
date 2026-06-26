@@ -110,7 +110,7 @@ and the heat equation becomes
    \delta \tepsnuc
    - \deriv{\delta \tLrad}{M_{r}} +
    \lambda \frac{\txih}{r} \deriv{\Lrad}{M_{r}} +
-   \frac{\lambda}{\rho r} \left( \delta \tFradh - \frac{\txih}{r} \right),
+   \frac{\lambda}{\rho r} \left( \delta \tFradh - \frac{\txih}{r} \Fradr \right),
 
 where
 
