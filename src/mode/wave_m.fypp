@@ -64,7 +64,6 @@ module wave_m
       type(point_t)            :: pt_o
       logical                  :: is_vacuum
       complex(RD), allocatable :: y_c(:,:)
-      real(RD)                 :: E_scl2
       complex(RD), public      :: scl
       complex(RD), public      :: omega
       complex(RD), public      :: l_i
@@ -219,11 +218,6 @@ contains
       x_ref = MIN(MAX(os_p%x_ref, wv%pt_i%x), wv%pt_o%x)
 
       wv%j_ref = MINLOC(abs(gr%pt%x - x_ref), DIM=1)
-
-      ! Cache the ratio E/|scl|**2, to avoid having to perform (expensive)
-      ! E integrations in the future
-
-      wv%E_scl2 = wv%E(use_cache=.FALSE.)/abs(wv%scl)**2
 
       ! Cache the vacuum surface flag
 
@@ -1988,43 +1982,24 @@ contains
 
    !****
 
-   function E(this, use_cache)
+   function E(this)
 
       class(wave_t), intent(in)     :: this
-      logical, intent(in), optional :: use_cache
       real(RD)                      :: E
 
-      logical               :: use_cache_
-      integer               :: j
-      real(RD), allocatable :: x(:)
-      real(RD), allocatable :: dE_dx(:)
+      integer  :: j
+      real(RD) :: x(this%n)
+      real(RD) :: dE_dx(this%n)
 
       ! Calculate the inertia, in units of M_star R_star**2
 
-      if (PRESENT(use_cache)) then
-         use_cache_ = use_cache
-      else
-         use_cache_ = .TRUE.
-      endif
+      !$OMP PARALLEL DO
+      do j = 1, this%n
+         x(j) = this%gr%pt(j)%x
+         dE_dx(j) = this%dE_dx(j)
+      end do
 
-      if (use_cache_) then
-
-         E = this%E_scl2*abs(this%scl)**2
-
-      else
-
-         allocate(x(this%n))
-         allocate(dE_dx(this%n))
-
-         !$OMP PARALLEL DO
-         do j = 1, this%n
-            x(j) = this%gr%pt(j)%x
-            dE_dx(j) = this%dE_dx(j)
-         end do
-
-         E = integrate(x, dE_dx)
-
-      end if
+      E = integrate(x, dE_dx)
 
       ! Finish
 

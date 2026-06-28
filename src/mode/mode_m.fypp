@@ -47,12 +47,14 @@ module mode_m
    ! Derived-type definitions
 
    type, extends(wave_t) :: mode_t
-      integer :: n_pg
-      integer :: n_p
-      integer :: n_g
+      real(RD) :: E_scl2
+      integer  :: n_pg
+      integer  :: n_p
+      integer  :: n_g
    contains
       private
-      procedure :: classify_
+      procedure, public :: E
+      procedure         :: classify_
    end type mode_t
 
    ! Interfaces
@@ -88,10 +90,15 @@ contains
 
       md%wave_t = wv
 
+      ! Cache the ratio E/|scl|**2, to avoid having to perform (expensive)
+      ! E integrations in the future
+
+      md%E_scl2 = wv%E()/abs(wv%scl)**2
+
       ! Normalize so that y_1 at the reference point is purely real, and
       ! the total inertia E is unity
 
-      y_1_ref = md%y_i(1, md%j_ref)
+      y_1_ref = wv%y_i(1, wv%j_ref)
 
       if (abs(y_1_ref) > TINY(0._RD)) then
          f_phase = CONJG(y_1_ref)/abs(y_1_ref)
@@ -99,7 +106,7 @@ contains
          f_phase = 1._RD
       endif
 
-      md%scl = md%scl/sqrt(md%E())*f_phase
+      md%scl = wv%scl/sqrt(wv%E())*f_phase
 
       ! Classify the mode
 
@@ -110,6 +117,23 @@ contains
       return
 
    end function mode_t_
+
+   !****
+
+   function E(this)
+
+      class(mode_t), intent(in)     :: this
+      real(RD)                      :: E
+
+      ! Calculate the inertia, in units of M_star R_star**2
+
+      E = this%E_scl2*abs(this%scl)**2
+
+      ! Finish
+
+      return
+
+   end function E
 
    !****
 
