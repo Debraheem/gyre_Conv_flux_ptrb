@@ -578,7 +578,6 @@ contains
       real(RD)    :: c_1
       real(RD)    :: Omega_rot
       complex(RD) :: omega_c
-      complex(RD) :: lambda
 
       ! Evaluate the horizontal displacement perturbation, in units of
       ! R_star

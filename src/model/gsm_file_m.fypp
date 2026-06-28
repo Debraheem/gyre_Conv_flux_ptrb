@@ -96,7 +96,6 @@ contains
       real(RD), allocatable       :: c_egv(:)
       real(RD), allocatable       :: eps_rho(:)
       real(RD), allocatable       :: eps_T(:)
-      type(evol_model_t), pointer :: em
 
       ! Read data from the GSM-format file
 
