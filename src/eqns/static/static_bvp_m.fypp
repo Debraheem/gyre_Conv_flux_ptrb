@@ -182,6 +182,7 @@ contains
       real(RD)                :: U
       real(RD)                :: c_1
       complex(RD)             :: lambda
+      complex(RD)             :: l_e
       complex(RD)             :: y_c(6,bp%n)
       complex(RD)             :: y_h(bp%n)
       type(wave_t)            :: wv
@@ -192,7 +193,7 @@ contains
 
       ! Convert to canonical form
 
-      st_c = state_ct(CMPLX(st%omega, KIND=RD), st%omega, y_T_1=st%y_T_1)
+      st_c = state_ct(CMPLX(0._RD, KIND=RD), 0._RD, y_T_1=st%y_T_1)
 
       ml => bp%cx%model()
 
@@ -202,13 +203,13 @@ contains
          associate( &
             y_T_1 => st%y_T_1, &
             pt => bp%gr%pt(j), &
-            alpha_grv => bp%cx%alpha_grv, &
-            l_e => bp%cx%l)
+            alpha_grv => bp%cx%alpha_grv)
 
             U = ml%coeff(I_U, pt)
             c_1 = ml%coeff(I_C_1, pt)
 
-            lambda = l_e*(l_e+1._RD)
+            lambda = bp%cx%lambda(0._RD, st_c)
+            l_e = bp%cx%l_e(0._RD, st_c)
 
             y_c(1,j) = -(alpha_grv*y(1,j) + c_1*y_T_1)
             y_c(2,j) = y_c(1,j)

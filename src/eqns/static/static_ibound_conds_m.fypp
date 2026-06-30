@@ -143,7 +143,8 @@ contains
       real(RD), contiguous, intent(out), optional :: s(:)
       logical, intent(in), optional               :: trans
 
-      logical :: trans_
+      logical  :: trans_
+      real(RD) :: l_e
 
       if (PRESENT(trans)) then
          trans_ = trans
@@ -166,12 +167,9 @@ contains
       ! Evaluate the inner boundary condition matrix and inhomogeneous
       ! vector (regularity-enforcing)
 
-      associate (&
-         l_e => this%cx%l)
+      l_e = this%cx%l_e(0._RD, state_rt(0._RD))
 
-         #:include 'IB_regular.inc'
-
-      end associate
+      #:include 'IB_regular.inc'
 
       ! Finish
 

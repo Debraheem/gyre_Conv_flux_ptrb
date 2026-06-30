@@ -149,7 +149,8 @@ contains
       real(RD), contiguous, intent(out), optional :: s(:)
       logical, intent(in), optional               :: trans
 
-      logical :: trans_
+      logical  :: trans_
+      real(RD) :: l_e
 
       if (PRESENT(trans)) then
          trans_ = trans
@@ -174,8 +175,9 @@ contains
 
       associate ( &
          y_T_1 => st%y_T_1, &
-         U => this%U, &
-         l_e => this%cx%l)
+         U => this%U)
+
+         l_e = this%cx%l_e(0._RD, state_rt(0._RD))
 
          #:include 'OB_vacuum.inc'
 

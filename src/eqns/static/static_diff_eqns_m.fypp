@@ -46,6 +46,8 @@ module static_diff_eqns_m
       real(RD)                 :: U
       real(RD)                 :: c_1
       real(RD)                 :: x
+      real(RD)                 :: lambda
+      real(RD)                 :: l_e
    contains
       private
       procedure, public :: eval
@@ -95,6 +97,11 @@ contains
       de%U = ml%coeff(I_U, pt)
       de%c_1 = ml%coeff(I_C_1, pt)
 
+      if (cx%angular_cache) then
+         de%lambda = cx%lambda(0._RD, state_rt(0._RD))
+         de%l_e = cx%l_e(0._RD, state_rt(0._RD))
+      end if
+
       ! Other initializations
 
       de%x = pt%x
@@ -142,6 +149,7 @@ contains
 
       logical  :: trans_
       real(RD) :: lambda
+      real(RD) :: l_e
       real(RD) :: del_x
 
       if (PRESENT(trans)) then
@@ -166,9 +174,15 @@ contains
          U => this%U, &
          c_1 => this%c_1, &
          x => this%x, &
-         l_e => this%cx%l)
+         angular_cache => this%cx%angular_cache)
 
-         lambda = l_e*(l_e+1._RD)
+         if (angular_cache) then
+            lambda = this%lambda
+            l_e = this%l_e
+         else
+            lambda = this%cx%lambda(0._RD, state_rt(0._RD))
+            l_e = this%cx%l_e(0._RD, state_rt(0._RD))
+         end if
 
          del_x = del/x
 
