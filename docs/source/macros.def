@@ -102,6 +102,7 @@ alphathm	\alpha_{\rm thm}
 alphagrv	\alpha_{\rm grv}
 alphagbc	\alpha_{\rm gbc}
 alphahfl	\alpha_{\rm hfl}
+alphahfc	\alpha_{\rm hfc}
 alpharht	\alpha_{\rm rht}
 alphagam	\alpha_{\gamma}
 alphapi	\alpha_{\pi}
@@ -131,6 +132,7 @@ dcrad	\partial\crad
 cthn	c_{\rm thn}
 dcthn	\partial\cthn
 cthk	c_{\rm thk}
+chfc	c_{\rm hfc}
 ckapad	c_{\kappa,{\rm ad}}
 ckapS	c_{\kappa,S}
 ceps	c_{\epsilon}

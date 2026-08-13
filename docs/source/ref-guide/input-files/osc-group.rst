@@ -131,6 +131,13 @@ available:
    Scaling factor for horizontal flux perturbations (see the :math:`\alphahfl`
    entry in the :ref:`osc-physics-switches` section)
 
+.. nml:option:: alpha_hfc
+   :type: real
+   :default: 0
+
+   Scaling factor for horizontal convective heat-flux perturbations (see the
+   :math:`\alphahfc` entry in the :ref:`osc-physics-switches` section)
+
 .. nml:option:: alpha_gam
    :type: real
    :default: 1
@@ -209,6 +216,41 @@ available:
      case 1 described by :ads_citet:`pesnell:1990`
    - :nml:value:`'FROZEN_PESNELL_4'` : Freeze Lagrangian perturbation of convective luminosity;
      case 4 described by :ads_citet:`pesnell:1990`
+   - :nml:value:`'PERTURBED_TDC_LOCAL'` : Evaluate the local TDC luminosity and
+     velocity equations from a version-1.30 MESA-format model. The local
+     algebraic system determines :math:`\delta\nabla` and :math:`\delta A` and
+     replaces the radiative thermal-gradient closure. Set
+     :nml:option:`alpha_hfc <osc.alpha_hfc>` to 1 to include the horizontal
+     convective heat-flux term for nonradial modes. Set
+     :nml:option:`tdc_perturb_mlt_Pturb <osc.tdc_perturb_mlt_Pturb>` to
+     :nml:value:`.TRUE.` to include the local MLT turbulent-pressure
+     perturbation. This scheme requires :nml:option:`variables_set
+     <osc.variables_set>` = :nml:value:`'GYRE'` and does not support
+     :nml:option:`alpha_trb <osc.alpha_trb>` > 0 or inhomogeneous forcing.
+
+.. nml:option:: tdc_yenv_scheme
+   :type: string
+   :default: 'BACKGROUND_RATIO'
+
+   Scheme for reconstructing the effective TDC superadiabaticity
+   :math:`Y_{\rm env}` from a schema-130 MESA profile; one of
+
+   - :nml:value:`'BACKGROUND_RATIO'` : Infer :math:`Y_{\rm env}` from the
+     exported background convective luminosity.
+   - :nml:value:`'NONE'` : Use :math:`Y_{\rm env}=Y`.
+
+.. nml:option:: tdc_perturb_mlt_Pturb
+   :type: logical
+   :default: .FALSE.
+
+   Include the local MLT turbulent-pressure perturbation in the
+   :nml:value:`'PERTURBED_TDC_LOCAL'` convection branch. The turbulent-pressure
+   amplitude is read from the version-1.30 ``tdc_mlt_Pturb0`` model
+   coefficient. When this option is :nml:value:`.TRUE.` and
+   ``tdc_mlt_Pturb0`` is nonzero at a mesh point, the local TDC closure uses a
+   three-by-three solve for the EOS-pressure perturbation,
+   :math:`\delta\nabla`, and :math:`\delta A`. Otherwise it uses the default
+   two-by-two solve for :math:`\delta\nabla` and :math:`\delta A`.
 
 .. nml:option:: deps_scheme
    :type: string

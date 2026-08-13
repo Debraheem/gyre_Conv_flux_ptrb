@@ -20,3 +20,4 @@ the initial header line:
    mesa-file-format-v1.00
    mesa-file-format-v1.01
    mesa-file-format-v1.20
+   mesa-file-format-v1.30

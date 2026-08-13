@@ -43,6 +43,7 @@ module mesa_file_m
    integer, parameter :: N_COLS_V0_19 = 18
    integer, parameter :: N_COLS_V1_0X = 18
    integer, parameter :: N_COLS_V1_20 = 19
+   integer, parameter :: N_COLS_V1_30 = 38
 
    ! Interfaces
 
@@ -107,6 +108,15 @@ contains
          n_cols = N_COLS_V1_0X
       case (120)
          n_cols = N_COLS_V1_20
+      case (130)
+         n_cols = N_COLS_V1_30
+         if (ml_p%interp_type == 'CUBIC') then
+            if (ml_p%deriv_type /= 'MONO') then
+               @:ABORT('MESA file version 1.30 requires deriv_type = MONO for CUBIC interpolation')
+            end if
+         else if (ml_p%interp_type /= 'LINEAR') then
+            @:ABORT('MESA file version 1.30 requires interp_type = LINEAR or CUBIC')
+         end if
       case default
          @:ABORT('Unrecognized MESA file version')
       end select
@@ -149,9 +159,11 @@ contains
       integer, intent(in)           :: version
       type(evol_model_t)            :: ml
 
+      integer                     :: j
       real(RD)                    :: M_star
       real(RD)                    :: R_star
       real(RD)                    :: L_star
+      real(RD)                    :: t_dyn
       integer                     :: n
       real(RD), allocatable       :: r(:)
       real(RD), allocatable       :: M_r(:)
@@ -185,6 +197,33 @@ contains
       real(RD), allocatable       :: c_thk(:)
       real(RD), allocatable       :: c_eps(:)
       real(RD), allocatable       :: c_egv(:)
+      real(RD), allocatable       :: tdc_r(:)
+      real(RD), allocatable       :: tdc_m(:)
+      real(RD), allocatable       :: tdc_L_r(:)
+      real(RD), allocatable       :: tdc_Peos(:)
+      real(RD), allocatable       :: tdc_T(:)
+      real(RD), allocatable       :: tdc_rho(:)
+      real(RD), allocatable       :: tdc_kap(:)
+      real(RD), allocatable       :: tdc_L_conv0(:)
+      real(RD), allocatable       :: tdc_A0(:)
+      real(RD), allocatable       :: tdc_D_h(:)
+      real(RD), allocatable       :: tdc_c_hfc(:)
+      real(RD), allocatable       :: tdc_Hp(:)
+      real(RD), allocatable       :: tdc_alpha_mlt(:)
+      real(RD), allocatable       :: tdc_Cp(:)
+      real(RD), allocatable       :: tdc_chiT(:)
+      real(RD), allocatable       :: tdc_chiRho(:)
+      real(RD), allocatable       :: tdc_gradL(:)
+      real(RD), allocatable       :: tdc_gradT(:)
+      real(RD), allocatable       :: tdc_alpha_C(:)
+      real(RD), allocatable       :: tdc_alpha_S(:)
+      real(RD), allocatable       :: tdc_alpha_D(:)
+      real(RD), allocatable       :: tdc_alpha_R(:)
+      real(RD), allocatable       :: tdc_alpha_Pt(:)
+      real(RD), allocatable       :: tdc_alpha_M(:)
+      real(RD), allocatable       :: tdc_include_mlt_corr(:)
+      real(RD), allocatable       :: tdc_mlt_Pturb_factor(:)
+      real(RD), allocatable       :: tdc_mlt_Pturb0(:)
 
       ! Extract data from the global and point arrays
 
@@ -203,6 +242,8 @@ contains
          call extract_data_v1_0X_()
       case (120)
          call extract_data_v1_20_()
+      case (130)
+         call extract_data_v1_30_()
       case default
          @:ABORT('unrecognized MESA memory version')
       end select
@@ -243,13 +284,30 @@ contains
       c_thn = c_P*sqrt(G_GRAVITY*M_star/R_star**3)/(A_RADIATION*C_LIGHT*kap*T**3)
       c_thk = 4._RD*PI*rho*T*c_P*sqrt(G_GRAVITY*M_star/R_star**3)*R_star**3/L_star
 
+      if (version == 130) then
+         tdc_r = r
+         tdc_m = M_r
+         tdc_L_r = L_r
+         tdc_Peos = P
+         tdc_T = T
+         tdc_rho = rho
+         tdc_kap = kap
+         allocate(tdc_c_hfc(n))
+         tdc_c_hfc = 0._RD
+         t_dyn = sqrt(R_star**3/(G_GRAVITY*M_star))
+         do j = 1,n
+            if (x(j) > 0._RD .AND. tdc_A0(j) > 0._RD) &
+               tdc_c_hfc(j) = c_thk(j)*tdc_D_h(j)*t_dyn/r(j)**2
+         end do
+      end if
+
       allocate(c_egv(n))
 
       select case (version)
       case (101)
          c_eps = 4._RD*PI*rho*eps*R_star**3/L_star
          c_egv = 0._RD
-      case (120)
+      case (120,130)
          c_eps = 4._RD*PI*rho*eps*R_star**3/L_star
          c_egv = 4._RD*PI*rho*eps_grav*R_star**3/L_star
       case default
@@ -289,6 +347,36 @@ contains
       call ml%define(I_KAP_T, kap_T)
 
       call ml%define(I_OMEGA_ROT, Omega_rot)
+
+      if (version == 130) then
+         call ml%define(I_TDC_R, tdc_r)
+         call ml%define(I_TDC_M, tdc_m)
+         call ml%define(I_TDC_L_R, tdc_L_r)
+         call ml%define(I_TDC_PEOS, tdc_Peos)
+         call ml%define(I_TDC_T, tdc_T)
+         call ml%define(I_TDC_RHO, tdc_rho)
+         call ml%define(I_TDC_KAP, tdc_kap)
+         call ml%define(I_TDC_L_CONV0, tdc_L_conv0)
+         call ml%define(I_TDC_A0, tdc_A0)
+         call ml%define(I_TDC_D_H, tdc_D_h)
+         call ml%define(I_TDC_C_HFC, tdc_c_hfc)
+         call ml%define(I_TDC_HP, tdc_Hp)
+         call ml%define(I_TDC_ALPHA_MLT, tdc_alpha_mlt)
+         call ml%define(I_TDC_CP, tdc_Cp)
+         call ml%define(I_TDC_CHIT, tdc_chiT)
+         call ml%define(I_TDC_CHIRHO, tdc_chiRho)
+         call ml%define(I_TDC_GRADL, tdc_gradL)
+         call ml%define(I_TDC_GRADT, tdc_gradT)
+         call ml%define(I_TDC_ALPHA_C, tdc_alpha_C)
+         call ml%define(I_TDC_ALPHA_S, tdc_alpha_S)
+         call ml%define(I_TDC_ALPHA_D, tdc_alpha_D)
+         call ml%define(I_TDC_ALPHA_R, tdc_alpha_R)
+         call ml%define(I_TDC_ALPHA_PT, tdc_alpha_Pt)
+         call ml%define(I_TDC_ALPHA_M, tdc_alpha_M)
+         call ml%define(I_TDC_INCLUDE_MLT_CORR, tdc_include_mlt_corr)
+         call ml%define(I_TDC_MLT_PTURB_FACTOR, tdc_mlt_Pturb_factor)
+         call ml%define(I_TDC_MLT_PTURB0, tdc_mlt_Pturb0)
+      end if
 
       call ml%commit()
 
@@ -508,6 +596,76 @@ contains
          return
 
       end subroutine extract_data_v1_20_
+
+      subroutine extract_data_v1_30_()
+
+         real(RD), allocatable :: eps_eps_rho(:)
+         real(RD), allocatable :: eps_eps_T(:)
+         real(RD), allocatable :: kap_kap_T(:)
+         real(RD), allocatable :: kap_kap_rho(:)
+
+         @:CHECK_BOUNDS(SIZE(point_data, 1), N_COLS_V1_30)
+
+         ! Extract data from the version-1.30 point array
+
+         r = point_data(1,:)
+         M_r = point_data(2,:)
+         L_r = point_data(3,:)
+         P = point_data(4,:)
+         T = point_data(5,:)
+         rho = point_data(6,:)
+         nabla = point_data(7,:)
+         N2 = point_data(8,:)
+         Gamma_1 = point_data(9,:)
+         nabla_ad = point_data(10,:)
+         ups_T = point_data(11,:)
+         kap = point_data(12,:)
+         kap_kap_T = point_data(13,:)
+         kap_kap_rho = point_data(14,:)
+         eps = point_data(15,:)
+         eps_eps_T = point_data(16,:)
+         eps_eps_rho = point_data(17,:)
+         eps_grav = point_data(18,:)
+         Omega_rot = point_data(19,:)
+         tdc_L_conv0 = point_data(20,:)
+         tdc_A0 = point_data(21,:)
+         tdc_D_h = point_data(22,:)
+         tdc_Hp = point_data(23,:)
+         tdc_alpha_mlt = point_data(24,:)
+         tdc_Cp = point_data(25,:)
+         tdc_chiT = point_data(26,:)
+         tdc_chiRho = point_data(27,:)
+         tdc_gradL = point_data(28,:)
+         tdc_gradT = point_data(29,:)
+         tdc_alpha_C = point_data(30,:)
+         tdc_alpha_S = point_data(31,:)
+         tdc_alpha_D = point_data(32,:)
+         tdc_alpha_R = point_data(33,:)
+         tdc_alpha_Pt = point_data(34,:)
+         tdc_alpha_M = point_data(35,:)
+         tdc_include_mlt_corr = point_data(36,:)
+         tdc_mlt_Pturb_factor = point_data(37,:)
+         tdc_mlt_Pturb0 = point_data(38,:)
+
+         allocate(eps_rho(n))
+         allocate(eps_T(n))
+
+         where (eps /= 0._RD)
+            eps_rho = eps_eps_rho/eps
+            eps_T = eps_eps_T/eps
+         elsewhere
+            eps_rho = 0._RD
+            eps_T = 0._RD
+         end where
+
+         kap_T = kap_kap_T/kap
+         kap_rho = kap_kap_rho/kap
+
+         ! Finish
+
+         return
+
+      end subroutine extract_data_v1_30_
 
    end function mesa_model_t_data_
 

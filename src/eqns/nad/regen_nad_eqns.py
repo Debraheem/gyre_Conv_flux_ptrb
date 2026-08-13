@@ -90,7 +90,7 @@ A = sp.Matrix([
      V*c_eps_ad - lamda*c_rad*alpha_hfl*nabla_ad/nabla + lamda*f_conv/(c_1(x)*alpha_omg*omega_c**2) + alpha_egv*c_egv*nabla_ad*V,
      alpha_grv*lamda*f_conv/(c_1(x)*alpha_omg*omega_c**2),
      0,
-     c_eps_S - alpha_hfl*lamda*c_rad/(nabla*V) + alpha_thm*i_omega_c*c_thk + alpha_egv*c_egv,
+     c_eps_S - alpha_hfl*lamda*c_rad/(nabla*V) - alpha_hfc*lamda*c_hfc + alpha_thm*i_omega_c*c_thk + alpha_egv*c_egv,
      -1 - l_i]
 ])
 

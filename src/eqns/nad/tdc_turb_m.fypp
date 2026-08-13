@@ -1,0 +1,539 @@
+! Module  : tdc_turb_m
+! Purpose : local TDC convective heat-flux closure
+!
+! Copyright 2013-2026 Rich Townsend & The GYRE Team
+!
+! This file is part of GYRE. GYRE is free software: you can
+! redistribute it and/or modify it under the terms of the GNU General
+! Public License as published by the Free Software Foundation, version 3.
+!
+! GYRE is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+! General Public License for more details.
+!
+! You should have received a copy of the GNU General Public License
+! along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+#:include 'gyre.inc'
+
+module tdc_turb_m
+
+   ! Uses
+
+   use forum_m, only: RD
+
+   use constants_m
+   use math_m
+   use model_m
+   use model_util_m
+   use point_m
+
+   use ISO_FORTRAN_ENV
+
+   ! No implicit typing
+
+   implicit none (type, external)
+
+   ! Derived-type definitions
+
+   type :: tdc_turb_bg_t
+      logical  :: active = .FALSE.
+      real(RD) :: r = 0._RD
+      real(RD) :: m_r = 0._RD
+      real(RD) :: L_r = 0._RD
+      real(RD) :: Peos = 0._RD
+      real(RD) :: T = 0._RD
+      real(RD) :: rho = 0._RD
+      real(RD) :: kap = 0._RD
+      real(RD) :: L_conv0 = 0._RD
+      real(RD) :: A0 = 0._RD
+      real(RD) :: Hp = 0._RD
+      real(RD) :: alpha_mlt = 0._RD
+      real(RD) :: Lambda = 0._RD
+      real(RD) :: c_P = 0._RD
+      real(RD) :: nabla_ad = 0._RD
+      real(RD) :: nabla_L = 0._RD
+      real(RD) :: nabla_T = 0._RD
+      real(RD) :: alpha_C = 0._RD
+      real(RD) :: alpha_S = 0._RD
+      real(RD) :: alpha_D = 0._RD
+      real(RD) :: alpha_R = 0._RD
+      real(RD) :: alpha_Pt = 0._RD
+      real(RD) :: Pturb0 = 0._RD
+      real(RD) :: beta_turb = 0._RD
+      real(RD) :: dln_Pturb0 = 0._RD
+      real(RD) :: Y = 0._RD
+      real(RD) :: Y_env = 0._RD
+      real(RD) :: f_env = 0._RD
+      real(RD) :: S0 = 0._RD
+      real(RD) :: D0 = 0._RD
+      real(RD) :: DR0 = 0._RD
+   end type tdc_turb_bg_t
+
+   ! Access specifiers
+
+   public :: tdc_turb_bg_t
+   public :: eval_tdc_turb_bg
+   public :: eval_tdc_turb_row_gyre
+
+   ! Default access
+
+   private
+
+contains
+
+   subroutine eval_tdc_turb_bg(ml, pt, yenv_scheme, bg)
+
+      class(model_t), intent(in)  :: ml
+      type(point_t), intent(in)   :: pt
+      character(*), intent(in)    :: yenv_scheme
+      type(tdc_turb_bg_t), intent(out) :: bg
+
+      real(RD), parameter :: sqrt_2_div_3 = SQRT(2._RD/3._RD)
+      real(RD), parameter :: alpha_c = 0.5_RD*sqrt_2_div_3
+      real(RD), parameter :: x_ALFAS = 0.5_RD*sqrt_2_div_3
+      real(RD), parameter :: x_CEDE = (8._RD/3._RD)*sqrt_2_div_3
+      real(RD), parameter :: x_GAMMAR = 2._RD*SQRT(3._RD)
+      real(RD), parameter :: tiny = 10._RD*EPSILON(1._RD)
+
+      real(RD) :: denom
+      real(RD) :: sigma_SB
+
+      ! Check the schema-130 coefficients
+
+      call check_model(ml, [ &
+         I_NABLA_AD, &
+         I_TDC_R, I_TDC_M, I_TDC_L_R, I_TDC_PEOS, I_TDC_T, I_TDC_RHO, I_TDC_KAP, &
+         I_TDC_L_CONV0, I_TDC_A0, I_TDC_HP, I_TDC_ALPHA_MLT, I_TDC_CP, &
+         I_TDC_GRADL, I_TDC_GRADT, &
+         I_TDC_ALPHA_C, I_TDC_ALPHA_S, I_TDC_ALPHA_D, I_TDC_ALPHA_R, I_TDC_ALPHA_PT, &
+         I_TDC_MLT_PTURB0])
+
+      ! Read the background values
+
+      bg = tdc_turb_bg_t()
+
+      bg%r = ml%coeff(I_TDC_R, pt)
+      bg%m_r = ml%coeff(I_TDC_M, pt)
+      bg%L_r = ml%coeff(I_TDC_L_R, pt)
+      bg%Peos = ml%coeff(I_TDC_PEOS, pt)
+      bg%T = ml%coeff(I_TDC_T, pt)
+      bg%rho = ml%coeff(I_TDC_RHO, pt)
+      bg%kap = ml%coeff(I_TDC_KAP, pt)
+      bg%L_conv0 = ml%coeff(I_TDC_L_CONV0, pt)
+      bg%A0 = ml%coeff(I_TDC_A0, pt)
+      bg%Hp = ml%coeff(I_TDC_HP, pt)
+      bg%alpha_mlt = ml%coeff(I_TDC_ALPHA_MLT, pt)
+      bg%Lambda = bg%alpha_mlt*bg%Hp
+      bg%c_P = ml%coeff(I_TDC_CP, pt)
+      bg%nabla_ad = ml%coeff(I_NABLA_AD, pt)
+      bg%nabla_L = ml%coeff(I_TDC_GRADL, pt)
+      bg%nabla_T = ml%coeff(I_TDC_GRADT, pt)
+      bg%active = bg%A0 > 0._RD
+      bg%alpha_C = ml%coeff(I_TDC_ALPHA_C, pt)
+      bg%alpha_S = ml%coeff(I_TDC_ALPHA_S, pt)
+      bg%alpha_D = ml%coeff(I_TDC_ALPHA_D, pt)
+      bg%alpha_R = ml%coeff(I_TDC_ALPHA_R, pt)
+      bg%alpha_Pt = ml%coeff(I_TDC_ALPHA_PT, pt)
+      bg%Pturb0 = ml%coeff(I_TDC_MLT_PTURB0, pt)
+
+      if (bg%Peos > 0._RD) bg%beta_turb = bg%Pturb0/bg%Peos
+      if (bg%Pturb0 > tiny) bg%dln_Pturb0 = ml%dcoeff(I_TDC_MLT_PTURB0, pt)
+
+      bg%Y = bg%nabla_T - bg%nabla_L
+
+      if (.NOT. bg%active) then
+         return
+      end if
+
+      if (bg%r <= 0._RD .OR. bg%m_r <= 0._RD .OR. bg%Peos <= 0._RD .OR. &
+            bg%T <= 0._RD .OR. bg%rho <= 0._RD .OR. bg%kap <= 0._RD .OR. &
+            bg%c_P <= 0._RD .OR. bg%Lambda <= 0._RD) then
+         @:ABORT('invalid active TDC background state')
+      end if
+
+      select case (TRIM(yenv_scheme))
+      case ('BACKGROUND_RATIO')
+         denom = bg%alpha_C*bg%alpha_mlt*alpha_c*bg%rho*bg%T*bg%c_P*4._RD*PI*bg%r**2*bg%A0
+         if (ABS(denom) > tiny*MAX(1._RD, ABS(bg%L_conv0))) then
+            bg%Y_env = bg%L_conv0/denom
+         else
+            bg%Y_env = bg%Y
+         end if
+      case ('NONE')
+         bg%Y_env = bg%Y
+      case default
+         @:ABORT('invalid tdc_yenv_scheme')
+      end select
+
+      if (ABS(bg%Y) > tiny) then
+         bg%f_env = bg%Y_env/bg%Y
+      else
+         bg%f_env = 0._RD
+      end if
+
+      sigma_SB = 0.25_RD*A_RADIATION*C_LIGHT
+
+      bg%S0 = bg%alpha_S*x_ALFAS*bg%alpha_mlt*bg%c_P*bg%T/bg%Hp*bg%nabla_ad*bg%Y_env
+      bg%D0 = bg%alpha_D*x_CEDE/bg%Lambda
+      bg%DR0 = 4._RD*sigma_SB*(bg%alpha_R*x_GAMMAR/bg%Lambda)**2*bg%T**3/ &
+         (bg%rho**2*bg%c_P*bg%kap)
+
+      ! Finish
+
+      return
+
+   end subroutine eval_tdc_turb_bg
+
+   !****
+
+   subroutine eval_tdc_turb_row_gyre(bg, x, l, V, c_1, Gamma_1, ups_T, nabla_ad, &
+         nabla, c_lum, c_rad, kap_T, kap_rho, i_omega_c, f_rht, &
+         perturb_mlt_Pturb, row_delta, y2eos_delta)
+
+      type(tdc_turb_bg_t), intent(in) :: bg
+      real(RD), intent(in)            :: x
+      integer, intent(in)             :: l
+      real(RD), intent(in)            :: V
+      real(RD), intent(in)            :: c_1
+      real(RD), intent(in)            :: Gamma_1
+      real(RD), intent(in)            :: ups_T
+      real(RD), intent(in)            :: nabla_ad
+      real(RD), intent(in)            :: nabla
+      real(RD), intent(in)            :: c_lum
+      real(RD), intent(in)            :: c_rad
+      real(RD), intent(in)            :: kap_T
+      real(RD), intent(in)            :: kap_rho
+      complex(RD), intent(in)         :: i_omega_c
+      complex(RD), intent(in)         :: f_rht
+      logical, intent(in)             :: perturb_mlt_Pturb
+      complex(RD), intent(out)        :: row_delta(6)
+      complex(RD), intent(out)        :: y2eos_delta(6)
+
+      real(RD), parameter :: x_ALFAP = 2._RD/3._RD
+      real(RD), parameter :: tiny = 10._RD*EPSILON(1._RD)
+
+      real(RD)    :: p
+      real(RD)    :: L_conv_norm
+      real(RD)    :: L_rad_norm
+      real(RD)    :: dyn_freq
+      real(RD)    :: dyenv_dnabla
+      real(RD)    :: B(6)
+      real(RD)    :: C(7)
+      real(RD)    :: R(7)
+      real(RD)    :: I(7)
+      complex(RD) :: G(7)
+      complex(RD) :: s_fac
+      complex(RD) :: k_rad(6)
+      complex(RD) :: q_y(6,6)
+      complex(RD) :: q1_y(6)
+      complex(RD) :: q2tot_y(6)
+      complex(RD) :: q2eos_y(6)
+      complex(RD) :: qS_y(6)
+      complex(RD) :: q6_y(6)
+      complex(RD) :: q5_rad_y(6)
+      complex(RD) :: q5_tdc_y(6)
+      complex(RD) :: A2(2,2)
+      complex(RD) :: rhs2(2,6)
+      complex(RD) :: sol2(2,6)
+      complex(RD) :: A3(3,3)
+      complex(RD) :: rhs3(3,6)
+      complex(RD) :: sol3(3,6)
+      integer     :: j
+      logical     :: use_Pturb
+
+      row_delta = 0._RD
+      y2eos_delta = 0._RD
+
+      if (.NOT. bg%active) then
+         return
+      end if
+
+      if (x <= 0._RD .OR. bg%r <= 0._RD .OR. bg%m_r <= 0._RD .OR. &
+            c_1 <= 0._RD .OR. ABS(nabla) <= tiny .OR. ABS(bg%A0) <= tiny) then
+         @:ABORT('invalid active TDC row state')
+      end if
+
+      p = x**(l - 2)
+
+      if (ABS(p) <= tiny) then
+         @:ABORT('invalid TDC row scaling')
+      end if
+
+      L_rad_norm = x**3*c_rad
+      if (ABS(bg%L_r) > tiny*MAX(1._RD, ABS(bg%L_conv0))) then
+         L_conv_norm = bg%L_conv0/bg%L_r*x**3*c_lum
+      else
+         L_conv_norm = x**3*(c_lum - c_rad)
+      end if
+
+      if (ABS(bg%Y_env) > tiny) then
+         dyenv_dnabla = bg%f_env
+      else
+         dyenv_dnabla = 0._RD
+      end if
+
+      B = 0._RD
+      C = 0._RD
+      R = 0._RD
+      I = 0._RD
+
+      q_y = 0._RD
+      q_y(1,1) = p
+      q_y(2,1) = -p*V
+      q_y(2,2) = p*V
+      q_y(3,:) = nabla_ad*q_y(2,:)
+      q_y(3,5) = q_y(3,5) + p
+      q_y(4,:) = q_y(2,:)/Gamma_1
+      q_y(4,5) = q_y(4,5) - ups_T*p
+      q_y(6,6) = x**(1 + l)
+
+      q1_y = q_y(1,:)
+      q2tot_y = q_y(2,:)
+      qS_y = 0._RD
+      qS_y(5) = p
+      q6_y = q_y(6,:)
+
+      ! delta L_rad/L_star = sum B_i q_i
+
+      B(2) = -L_rad_norm
+      B(3) = L_rad_norm*(4._RD - kap_T)
+      B(4) = -L_rad_norm*kap_rho
+      B(5) = L_rad_norm/nabla
+
+      ! delta L_conv/L_star = sum C_i q_i
+
+      C(1) = 2._RD*L_conv_norm
+      C(3) = L_conv_norm
+      C(4) = L_conv_norm
+      if (ABS(bg%Y_env) > tiny) C(5) = L_conv_norm*dyenv_dnabla/bg%Y_env
+      C(7) = L_conv_norm/bg%A0
+
+      ! Perturbation of the velocity-equation right-hand side
+
+      R(3) = bg%S0 - bg%A0*bg%DR0*(3._RD - kap_T)
+      R(4) = bg%A0*bg%DR0*(2._RD + kap_rho)
+      if (ABS(bg%Y_env) > tiny) R(5) = bg%S0*dyenv_dnabla/bg%Y_env
+      R(7) = -bg%DR0 - 2._RD*bg%A0*bg%D0
+
+      ! Perturbation of the velocity-equation inertial term
+
+      I(4) = -bg%A0*bg%alpha_Pt*x_ALFAP
+      I(7) = 2._RD
+
+      dyn_freq = SQRT(G_GRAVITY*bg%m_r*c_1/bg%r**3)
+      s_fac = -i_omega_c*dyn_freq
+      G = R - s_fac*I
+
+      k_rad = 0._RD
+      if (ABS(B(5)) <= tiny*MAX(1._RD, ABS(L_rad_norm))) then
+         @:ABORT('singular local radiative comparison solve')
+      end if
+      k_rad(1:4) = -B(1:4)/B(5)
+      k_rad(6) = 1._RD/B(5)
+
+      q5_rad_y = 0._RD
+      do j = 1,6
+         q5_rad_y = q5_rad_y + k_rad(j)*q_y(j,:)
+      end do
+
+      q5_tdc_y = 0._RD
+
+      use_Pturb = perturb_mlt_Pturb .AND. bg%beta_turb > tiny .AND. &
+         bg%Pturb0 > tiny .AND. ABS(bg%A0) > tiny
+
+      if (use_Pturb) then
+
+         if (ABS(V) <= tiny) then
+            @:ABORT('invalid local turbulent-pressure scaling')
+         end if
+
+         ! The 3x3 branch separates total and EOS pressure perturbations:
+         !
+         !    q2tot = q2eos + beta_turb*(q4eos + 2*q7/A0 - Dpt*q1)
+         !    q4eos = q2eos/Gamma_1 - ups_T*qS
+         !
+         ! Here q1 = xi_r/r and qS = delta S/cp.
+
+         A3 = 0._RD
+         rhs3 = 0._RD
+
+         A3(1,1) = 1._RD + bg%beta_turb/Gamma_1
+         A3(1,3) = 2._RD*bg%beta_turb/bg%A0
+         rhs3(1,:) = q2tot_y + bg%beta_turb*ups_T*qS_y + &
+            bg%beta_turb*bg%dln_Pturb0*q1_y
+
+         A3(2,1) = B(2) + (B(3) + C(3))*nabla_ad + (B(4) + C(4))/Gamma_1
+         A3(2,2) = B(5) + C(5)
+         A3(2,3) = C(7)
+         rhs3(2,:) = q6_y - (B(1) + C(1))*q1_y - &
+            ((B(3) + C(3)) - ups_T*(B(4) + C(4)))*qS_y
+
+         A3(3,1) = G(2) + G(3)*nabla_ad + G(4)/Gamma_1
+         A3(3,2) = G(5)
+         A3(3,3) = G(7)
+         rhs3(3,:) = -G(1)*q1_y - (G(3) - ups_T*G(4))*qS_y - G(6)*q6_y
+
+         call solve_local_3x3_(A3, rhs3, sol3)
+
+         q2eos_y = sol3(1,:)
+         q5_tdc_y = sol3(2,:)
+
+         y2eos_delta = (q2eos_y - q2tot_y)/(p*V)
+
+      else
+
+         A2(1,:) = [B(5) + C(5), C(7)]
+         A2(2,:) = [G(5), G(7)]
+
+         rhs2(1,:) = q6_y
+         rhs2(2,:) = -G(6)*q6_y
+         do j = 1,4
+            rhs2(1,:) = rhs2(1,:) - (B(j) + C(j))*q_y(j,:)
+            rhs2(2,:) = rhs2(2,:) - G(j)*q_y(j,:)
+         end do
+
+         call solve_local_2x2_(A2, rhs2, sol2)
+
+         q5_tdc_y = sol2(1,:)
+
+      end if
+
+      row_delta = V/(f_rht*p)*(q5_rad_y - q5_tdc_y)
+
+      ! Finish
+
+      return
+
+   end subroutine eval_tdc_turb_row_gyre
+
+   !****
+
+   subroutine solve_local_2x2_(A, b, sol)
+
+      complex(RD), intent(in)  :: A(2,2)
+      complex(RD), intent(in)  :: b(2,6)
+      complex(RD), intent(out) :: sol(2,6)
+
+      real(RD), parameter :: pivot_tol = 10._RD*EPSILON(1._RD)
+
+      complex(RD) :: M(2,8)
+      complex(RD) :: row_tmp(8)
+      complex(RD) :: fac
+      real(RD)    :: row_scale
+      integer     :: j
+
+      M(:,1:2) = A
+      M(:,3:8) = b
+
+      do j = 1,2
+         row_scale = MAXVAL(ABS(A(j,:)))
+         if (row_scale <= TINY(1._RD)) then
+            @:ABORT('singular local TDC 2x2 solve')
+         end if
+         M(j,:) = M(j,:)/row_scale
+      end do
+
+      if (ABS(M(2,1)) > ABS(M(1,1))) then
+         row_tmp = M(1,:)
+         M(1,:) = M(2,:)
+         M(2,:) = row_tmp
+      end if
+
+      if (ABS(M(1,1)) <= pivot_tol) then
+         @:ABORT('singular local TDC 2x2 solve')
+      end if
+
+      fac = M(2,1)/M(1,1)
+      M(2,1:8) = M(2,1:8) - fac*M(1,1:8)
+
+      if (ABS(M(2,2)) <= pivot_tol) then
+         @:ABORT('singular local TDC 2x2 solve')
+      end if
+
+      do j = 1,6
+         sol(2,j) = M(2,2+j)/M(2,2)
+         sol(1,j) = (M(1,2+j) - M(1,2)*sol(2,j))/M(1,1)
+      end do
+
+      ! Finish
+
+      return
+
+   end subroutine solve_local_2x2_
+
+   !****
+
+   subroutine solve_local_3x3_(A, b, sol)
+
+      complex(RD), intent(in)  :: A(3,3)
+      complex(RD), intent(in)  :: b(3,6)
+      complex(RD), intent(out) :: sol(3,6)
+
+      real(RD), parameter :: pivot_tol = 10._RD*EPSILON(1._RD)
+
+      complex(RD) :: M(3,9)
+      complex(RD) :: row_tmp(9)
+      complex(RD) :: fac
+      real(RD)    :: pivot_abs
+      real(RD)    :: row_scale
+      integer     :: j
+      integer     :: k
+      integer     :: i
+      integer     :: p
+
+      M(:,1:3) = A
+      M(:,4:9) = b
+
+      do i = 1,3
+         row_scale = MAXVAL(ABS(A(i,:)))
+         if (row_scale <= TINY(1._RD)) then
+            @:ABORT('singular local TDC 3x3 solve')
+         end if
+         M(i,:) = M(i,:)/row_scale
+      end do
+
+      do k = 1,3
+
+         p = k
+         pivot_abs = ABS(M(k,k))
+         do i = k + 1,3
+            if (ABS(M(i,k)) > pivot_abs) then
+               p = i
+               pivot_abs = ABS(M(i,k))
+            end if
+         end do
+
+         if (pivot_abs <= pivot_tol) then
+            @:ABORT('singular local TDC 3x3 solve')
+         end if
+
+         if (p /= k) then
+            row_tmp = M(k,:)
+            M(k,:) = M(p,:)
+            M(p,:) = row_tmp
+         end if
+
+         do i = k + 1,3
+            fac = M(i,k)/M(k,k)
+            M(i,k:9) = M(i,k:9) - fac*M(k,k:9)
+         end do
+
+      end do
+
+      do j = 1,6
+
+         sol(3,j) = M(3,3+j)/M(3,3)
+         sol(2,j) = (M(2,3+j) - M(2,3)*sol(3,j))/M(2,2)
+         sol(1,j) = (M(1,3+j) - M(1,2)*sol(2,j) - M(1,3)*sol(3,j))/M(1,1)
+
+      end do
+
+      ! Finish
+
+      return
+
+   end subroutine solve_local_3x3_
+
+end module tdc_turb_m

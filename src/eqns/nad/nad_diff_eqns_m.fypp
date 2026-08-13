@@ -34,6 +34,7 @@ module ${P}$_nad_diff_eqns_m
    use osc_par_m
    use point_m
    use state_m
+   use tdc_turb_m
 
    use ISO_FORTRAN_ENV
 
@@ -59,8 +60,10 @@ module ${P}$_nad_diff_eqns_m
       real(RD)                 :: ups_T
       real(RD)                 :: nabla_ad
       real(RD)                 :: nabla
+      real(RD)                 :: c_lum
       real(RD)                 :: c_rad
       real(RD)                 :: dc_rad
+      real(RD)                 :: c_hfc
       real(RD)                 :: c_thn
       real(RD)                 :: dc_thn
       real(RD)                 :: c_thk
@@ -68,10 +71,14 @@ module ${P}$_nad_diff_eqns_m
       real(RD)                 :: c_egv
       complex(RD)              :: c_eps_ad
       complex(RD)              :: c_eps_S
+      real(RD)                 :: kap_T
+      real(RD)                 :: kap_rho
       real(RD)                 :: c_kap_ad
       real(RD)                 :: c_kap_S
       real(RD)                 :: c_dif
       real(RD)                 :: f_conv
+      type(tdc_turb_bg_t)      :: tdc_bg
+      logical                  :: tdc_local = .FALSE.
       real(RD)                 :: Omega_rot
       real(RD)                 :: x
       complex(RD)              :: lambda
@@ -137,16 +144,25 @@ contains
       de%nabla_ad = ml%coeff(I_NABLA_AD, pt)
       de%nabla = ml%coeff(I_NABLA, pt)
       de%ups_T = ml%coeff(I_UPS_T, pt)
+      de%c_lum = ml%coeff(I_C_LUM, pt)
       de%c_rad = ml%coeff(I_C_RAD, pt)
       de%dc_rad = ml%dcoeff(I_C_RAD, pt)
+      de%c_hfc = 0._RD
+      if (cx%alpha_hfc /= 0._RD) then
+         call check_model(ml, [I_TDC_C_HFC])
+         de%c_hfc = ml%coeff(I_TDC_C_HFC, pt)
+      end if
       de%c_thn = ml%coeff(I_C_THN, pt)
       de%dc_thn = ml%dcoeff(I_C_THN, pt)
       de%c_thk = ml%coeff(I_C_THK, pt)
       de%c_eps = ml%coeff(I_C_EPS, pt)
       de%c_egv = ml%coeff(I_C_EGV, pt)
 
-      de%c_kap_ad = de%nabla_ad*cx%alpha_kat*ml%coeff(I_KAP_T, pt) + cx%alpha_kar*ml%coeff(I_KAP_RHO, pt)/de%Gamma_1
-      de%c_kap_S = cx%alpha_kat*ml%coeff(I_KAP_T, pt) - de%ups_T*cx%alpha_kar*ml%coeff(I_KAP_RHO, pt)
+      de%kap_T = cx%alpha_kat*ml%coeff(I_KAP_T, pt)
+      de%kap_rho = cx%alpha_kar*ml%coeff(I_KAP_RHO, pt)
+
+      de%c_kap_ad = de%nabla_ad*de%kap_T + de%kap_rho/de%Gamma_1
+      de%c_kap_S = de%kap_T - de%ups_T*de%kap_rho
 
       de%c_dif = -4._RD*de%nabla_ad*de%V*de%nabla + de%nabla_ad*(ml%dcoeff(I_NABLA_AD, pt) + de%V)
 
@@ -154,7 +170,15 @@ contains
       case ('FROZEN_PESNELL_1')
          de%f_conv = de%c_rad*(3._RD + de%dc_rad)
       case ('FROZEN_PESNELL_4')
-         de%f_conv = ml%coeff(I_C_LUM, pt)*(3._RD + ml%dcoeff(I_C_LUM, pt)) - (ml%coeff(I_C_LUM, pt) - de%c_rad)
+         de%f_conv = de%c_lum*(3._RD + ml%dcoeff(I_C_LUM, pt)) - (de%c_lum - de%c_rad)
+      case ('PERTURBED_TDC_LOCAL')
+         #:if P == 'gyre'
+         call eval_tdc_turb_bg(ml, pt, os_p%tdc_yenv_scheme, de%tdc_bg)
+         de%f_conv = de%c_lum*(3._RD + ml%dcoeff(I_C_LUM, pt))
+         de%tdc_local = .TRUE.
+         #:else
+         @:ABORT('conv_scheme = PERTURBED_TDC_LOCAL currently requires variables_set = GYRE')
+         #:endif
       case default
          @:ABORT('invalid conv_scheme')
       end select
@@ -230,6 +254,8 @@ contains
       complex(RD) :: df_rht
       complex(RD) :: c_eps_ad
       complex(RD) :: c_eps_S
+      complex(RD) :: tdc_row_delta(6)
+      complex(RD) :: tdc_y2eos_delta(6)
       real(RD)    :: del_x
       complex(RD) :: F_trb
 
@@ -263,17 +289,22 @@ contains
          nabla_ad => this%nabla_ad, &
          nabla => this%nabla, &
          ups_T => this%ups_T, &
+         c_lum => this%c_lum, &
          c_rad => this%c_rad, &
          dc_rad => this%dc_rad, &
+         c_hfc => this%c_hfc, &
          c_thn => this%c_thn, &
          dc_thn => this%dc_thn, &
          c_thk => this%c_thk, &
          c_eps => this%c_eps, &
          c_egv => this%c_egv, &
+         kap_T => this%kap_T, &
+         kap_rho => this%kap_rho, &
          c_kap_ad => this%c_kap_ad, &
          c_kap_S => this%c_kap_S, &
          c_dif => this%c_dif, &
          f_conv => this%f_conv, &
+         tdc_local => this%tdc_local, &
          Omega_rot => this%Omega_rot, &
          Omega_rot_i => this%cx%Omega_rot_i, &
          x => this%x, &
@@ -281,6 +312,7 @@ contains
          alpha_grv => this%cx%alpha_grv, &
          alpha_thm => this%cx%alpha_thm, &
          alpha_hfl => this%cx%alpha_hfl, &
+         alpha_hfc => this%cx%alpha_hfc, &
          alpha_rht => this%cx%alpha_rht, &
          alpha_omg => this%cx%alpha_omg, &
          alpha_gam => this%cx%alpha_gam, &
@@ -322,11 +354,42 @@ contains
 
          del_x = del/x
 
+         if (tdc_local .AND. alpha_trb > 0._RD) then
+            @:ABORT('PERTURBED_TDC_LOCAL does not yet support alpha_trb > 0')
+         end if
+
+         if (tdc_local .AND. PRESENT(r)) then
+            @:ABORT('PERTURBED_TDC_LOCAL does not yet support inhomogeneous forcing')
+         end if
+
          if (alpha_trb > 0._RD) then
             F_trb = i_omega_c*this%cx%c_trb(st, pt)
             #:include 'A_trb.inc'
          else
             #:include 'A.inc'
+         end if
+
+         if (tdc_local) then
+            call eval_tdc_turb_row_gyre(this%tdc_bg, x, this%cx%l, V, c_1, Gamma_1, &
+               ups_T, nabla_ad, nabla, c_lum, c_rad, kap_T, kap_rho, i_omega_c, &
+               f_rht, this%cx%tdc_perturb_mlt_Pturb, tdc_row_delta, &
+               tdc_y2eos_delta)
+
+            if (trans_) then
+               A(:,5) = A(:,5) + del_x*tdc_row_delta
+               A(:,1) = A(:,1) - del_x*alpha_gam*V_g*tdc_y2eos_delta
+               A(:,2) = A(:,2) + del_x*As*tdc_y2eos_delta
+               A(:,4) = A(:,4) + del_x*alpha_grv*U*V_g*tdc_y2eos_delta
+               A(:,6) = A(:,6) + del_x*(V*c_eps_ad + alpha_egv*c_egv*nabla_ad*V - &
+                  alpha_hfl*lambda*c_rad*nabla_ad/nabla)*tdc_y2eos_delta
+            else
+               A(5,:) = A(5,:) + del_x*tdc_row_delta
+               A(1,:) = A(1,:) - del_x*alpha_gam*V_g*tdc_y2eos_delta
+               A(2,:) = A(2,:) + del_x*As*tdc_y2eos_delta
+               A(4,:) = A(4,:) + del_x*alpha_grv*U*V_g*tdc_y2eos_delta
+               A(6,:) = A(6,:) + del_x*(V*c_eps_ad + alpha_egv*c_egv*nabla_ad*V - &
+                  alpha_hfl*lambda*c_rad*nabla_ad/nabla)*tdc_y2eos_delta
+            end if
          end if
 
       end associate

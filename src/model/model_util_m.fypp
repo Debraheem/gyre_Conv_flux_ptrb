@@ -199,6 +199,60 @@ contains
          i = I_KAP_T
       case ('Omega_rot')
          i = I_OMEGA_ROT
+      case ('tdc_r')
+         i = I_TDC_R
+      case ('tdc_m')
+         i = I_TDC_M
+      case ('tdc_L_r')
+         i = I_TDC_L_R
+      case ('tdc_Peos')
+         i = I_TDC_PEOS
+      case ('tdc_T')
+         i = I_TDC_T
+      case ('tdc_rho')
+         i = I_TDC_RHO
+      case ('tdc_kap')
+         i = I_TDC_KAP
+      case ('tdc_L_conv0')
+         i = I_TDC_L_CONV0
+      case ('tdc_A0')
+         i = I_TDC_A0
+      case ('tdc_D_h')
+         i = I_TDC_D_H
+      case ('tdc_c_hfc')
+         i = I_TDC_C_HFC
+      case ('tdc_Hp')
+         i = I_TDC_HP
+      case ('tdc_alpha_mlt')
+         i = I_TDC_ALPHA_MLT
+      case ('tdc_Cp')
+         i = I_TDC_CP
+      case ('tdc_chiT')
+         i = I_TDC_CHIT
+      case ('tdc_chiRho')
+         i = I_TDC_CHIRHO
+      case ('tdc_gradL')
+         i = I_TDC_GRADL
+      case ('tdc_gradT')
+         i = I_TDC_GRADT
+      case ('tdc_alpha_C')
+         i = I_TDC_ALPHA_C
+      case ('tdc_alpha_S')
+         i = I_TDC_ALPHA_S
+      case ('tdc_alpha_D')
+         i = I_TDC_ALPHA_D
+      case ('tdc_alpha_R')
+         i = I_TDC_ALPHA_R
+      case ('tdc_alpha_Pt')
+         i = I_TDC_ALPHA_PT
+      case ('tdc_alpha_M')
+         i = I_TDC_ALPHA_M
+      case ('tdc_include_mlt_corr')
+         i = I_TDC_INCLUDE_MLT_CORR
+      case ('tdc_mlt_Pturb_factor')
+         i = I_TDC_MLT_PTURB_FACTOR
+      case ('tdc_mlt_Pturb0')
+         i = I_TDC_MLT_PTURB0
       case default
          @:ABORT('invalid coefficient name')
       end select
@@ -279,6 +333,60 @@ contains
          name = 'kap_T'
       case (I_OMEGA_ROT)
          name = 'Omega_rot'
+      case (I_TDC_R)
+         name = 'tdc_r'
+      case (I_TDC_M)
+         name = 'tdc_m'
+      case (I_TDC_L_R)
+         name = 'tdc_L_r'
+      case (I_TDC_PEOS)
+         name = 'tdc_Peos'
+      case (I_TDC_T)
+         name = 'tdc_T'
+      case (I_TDC_RHO)
+         name = 'tdc_rho'
+      case (I_TDC_KAP)
+         name = 'tdc_kap'
+      case (I_TDC_L_CONV0)
+         name = 'tdc_L_conv0'
+      case (I_TDC_A0)
+         name = 'tdc_A0'
+      case (I_TDC_D_H)
+         name = 'tdc_D_h'
+      case (I_TDC_C_HFC)
+         name = 'tdc_c_hfc'
+      case (I_TDC_HP)
+         name = 'tdc_Hp'
+      case (I_TDC_ALPHA_MLT)
+         name = 'tdc_alpha_mlt'
+      case (I_TDC_CP)
+         name = 'tdc_Cp'
+      case (I_TDC_CHIT)
+         name = 'tdc_chiT'
+      case (I_TDC_CHIRHO)
+         name = 'tdc_chiRho'
+      case (I_TDC_GRADL)
+         name = 'tdc_gradL'
+      case (I_TDC_GRADT)
+         name = 'tdc_gradT'
+      case (I_TDC_ALPHA_C)
+         name = 'tdc_alpha_C'
+      case (I_TDC_ALPHA_S)
+         name = 'tdc_alpha_S'
+      case (I_TDC_ALPHA_D)
+         name = 'tdc_alpha_D'
+      case (I_TDC_ALPHA_R)
+         name = 'tdc_alpha_R'
+      case (I_TDC_ALPHA_PT)
+         name = 'tdc_alpha_Pt'
+      case (I_TDC_ALPHA_M)
+         name = 'tdc_alpha_M'
+      case (I_TDC_INCLUDE_MLT_CORR)
+         name = 'tdc_include_mlt_corr'
+      case (I_TDC_MLT_PTURB_FACTOR)
+         name = 'tdc_mlt_Pturb_factor'
+      case (I_TDC_MLT_PTURB0)
+         name = 'tdc_mlt_Pturb0'
       case default
          @:ABORT('invalid coefficient index')
       end select

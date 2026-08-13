@@ -695,6 +695,32 @@ Stellar Structure
    Structure coefficient :math:`\cthk`; defined in
    :ref:`osc-struct-coeffs` section\ [#only-N]_
 
+.. ofile:field:: tdc_L_r
+   :type: real
+   :dim: :ofile:field:`n`
+
+   Schema-130 TDC background total luminosity :math:`L_r`
+
+.. ofile:field:: tdc_L_conv0
+   :type: real
+   :dim: :ofile:field:`n`
+
+   Schema-130 TDC background radial convective luminosity
+   :math:`L_{\rm conv,0}`
+
+.. ofile:field:: tdc_D_h
+   :type: real
+   :dim: :ofile:field:`n`
+
+   Schema-130 TDC horizontal convective thermal diffusivity
+
+.. ofile:field:: tdc_c_hfc
+   :type: real
+   :dim: :ofile:field:`n`
+
+   Schema-130 TDC horizontal convective heat-flux coefficient
+   :math:`\chfc`; defined in :ref:`osc-struct-coeffs` section\ [#only-N]_
+
 .. ofile:field:: c_eps
    :type: real
    :dim: :ofile:field:`n`
