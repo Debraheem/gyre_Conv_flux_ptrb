@@ -32,7 +32,11 @@ The independent variable is the fractional radius :math:`x \equiv r/\Rstar`
    y_{6} &= x^{-1-\ell}\, \frac{\delta \tLrad}{\Lstar},
    \end{aligned}
 
-where :math:`\Lstar` is the stellar luminosity.
+where :math:`\Lstar` is the stellar luminosity. For
+:nml:option:`conv_scheme <osc.conv_scheme>` =
+:nml:value:`'PERTURBED_TDC_LOCAL'`, :math:`y_6` is instead interpreted as
+:math:`x^{-1-\ell}\delta\tL/\Lstar`, where :math:`\delta\tL` is the total
+radiative-plus-convective luminosity perturbation.
 
 .. _osc-dimless-eqns:
 
@@ -86,7 +90,8 @@ The dimensionless oscillation equations are
    &
    \alphagrv \left[ \lambda \crad \frac{3 + \dcrad}{c_{1}\omega^{2}} \right] y_{3} + \mbox{} \\
    &
-   \left[ \cepsS - \alphahfl \frac{\lambda\crad}{\nabla V} + \ii \alphathm \omega \cthk + \alphaegv \cegv \right] y_{5} -
+   \left[ \cepsS - \alphahfl \frac{\lambda\crad}{\nabla V}
+   - \alphahfc \lambda \chfc + \ii \alphathm \omega \cthk + \alphaegv \cegv \right] y_{5} -
    \left[ 1 + \ell \right] y_{6},
    \end{aligned}
 
@@ -276,6 +281,7 @@ defined as follows:
    \dcthn = \deriv{\ln \cthn}{\ln r} \\
    %
    \cthk = x^{-3} \frac{4\pi r^{3} \cP T \rho}{\Lstar} \sqrt{\frac{G\Mstar}{\Rstar^{3}}} \qquad
+   \chfc = \cthk \frac{D_{{\rm conv},h}}{r^{2}} \sqrt{\frac{\Rstar^{3}}{G\Mstar}} \qquad
    \cegv = x^{-3} \frac{4\pi r^{3} \rho \epsgrav}{\Lstar}
    \end{gathered}
 
@@ -319,6 +325,11 @@ the corresponding namelist options.
      - Scaling factor for horizontal flux perturbations. Set to 1 for
        normal behavior, and to 0 for the non-adiabatic radial flux (NARF)
        approximation (see :ads_citealp:`townsend:2003b`)
+   * - :math:`\alphahfc`
+     - :nml:option:`alpha_hfc`
+     - Scaling factor for horizontal convective heat-flux perturbations. Set
+       to 0 for frozen horizontal convective heat transport, and to 1 to use
+       schema-130 TDC background data
    * - :math:`\alphagam`
      - :nml:option:`alpha_gam`
      - Scaling factor for g-mode isolation. Set to 1 for normal behavior,

@@ -148,6 +148,33 @@ module model_m
    public :: I_KAP_RHO
    public :: I_KAP_T
    public :: I_OMEGA_ROT
+   public :: I_TDC_R
+   public :: I_TDC_M
+   public :: I_TDC_L_R
+   public :: I_TDC_PEOS
+   public :: I_TDC_T
+   public :: I_TDC_RHO
+   public :: I_TDC_KAP
+   public :: I_TDC_L_CONV0
+   public :: I_TDC_A0
+   public :: I_TDC_D_H
+   public :: I_TDC_C_HFC
+   public :: I_TDC_HP
+   public :: I_TDC_ALPHA_MLT
+   public :: I_TDC_CP
+   public :: I_TDC_CHIT
+   public :: I_TDC_CHIRHO
+   public :: I_TDC_GRADL
+   public :: I_TDC_GRADT
+   public :: I_TDC_ALPHA_C
+   public :: I_TDC_ALPHA_S
+   public :: I_TDC_ALPHA_D
+   public :: I_TDC_ALPHA_R
+   public :: I_TDC_ALPHA_PT
+   public :: I_TDC_ALPHA_M
+   public :: I_TDC_INCLUDE_MLT_CORR
+   public :: I_TDC_MLT_PTURB_FACTOR
+   public :: I_TDC_MLT_PTURB0
    public :: I_LAST
 
    ! Default access

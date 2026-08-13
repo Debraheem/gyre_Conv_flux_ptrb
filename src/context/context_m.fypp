@@ -68,6 +68,7 @@ module context_m
       real(RD), public               :: alpha_gbc
       real(RD), public               :: alpha_thm
       real(RD), public               :: alpha_hfl
+      real(RD), public               :: alpha_hfc
       real(RD), public               :: alpha_omg
       real(RD), public               :: alpha_gam
       real(RD), public               :: alpha_pi
@@ -78,6 +79,7 @@ module context_m
       real(RD), public               :: alpha_trb
       real(RD), public               :: alpha_con
       integer, public                :: conv_scheme
+      logical, public                :: tdc_perturb_mlt_Pturb
       integer                        :: deps_source
       logical                        :: complex_lambda
       type(cubic_interp_ct)          :: ci_eps_rho
@@ -172,6 +174,7 @@ contains
       cx%alpha_gbc = os_p%alpha_gbc
       cx%alpha_thm = os_p%alpha_thm
       cx%alpha_hfl = os_p%alpha_hfl
+      cx%alpha_hfc = os_p%alpha_hfc
       cx%alpha_gam = os_p%alpha_gam
       cx%alpha_pi = os_p%alpha_pi
       cx%alpha_kar = os_p%alpha_kar
@@ -180,6 +183,7 @@ contains
       cx%alpha_egv = os_p%alpha_egv
       cx%alpha_trb = os_p%alpha_trb
       cx%alpha_con = os_p%alpha_con
+      cx%tdc_perturb_mlt_Pturb = os_p%tdc_perturb_mlt_Pturb
 
       select case (os_p%time_factor)
       case ('OSC')

@@ -82,9 +82,9 @@ A(3, 6) = del_x*(F_trb*alpha_grv*lambda*(V*alpha_egv*c_egv*nabla_ad + V* &
 A(4, 6) = 0
 A(5, 6) = del_x*(F_trb*om2*ups_T*(V*alpha_egv*c_egv*nabla_ad + V* &
       c_eps_ad - alpha_hfl*c_rad*lambda*nabla_ad/nabla + eta*f_conv)/( &
-      F_trb*V_g*alpha_gam*om2 - F_trb*lambda - om2) + alpha_egv*c_egv + &
-      alpha_thm*c_thk*i_omega_c + c_eps_S - alpha_hfl*c_rad*lambda/(V* &
-      nabla))
+      F_trb*V_g*alpha_gam*om2 - F_trb*lambda - om2) + alpha_egv*c_egv - &
+      alpha_hfc*c_hfc*lambda + alpha_thm*c_thk*i_omega_c + c_eps_S - &
+      alpha_hfl*c_rad*lambda/(V*nabla))
 A(6, 6) = del_x*(-l_i - 1)
 else
 A(1, 1) = del_x*(V_g - l_i + (-V_g*alpha_gam + eta)*(F_trb*V_g*om2 - 2* &
@@ -164,9 +164,9 @@ A(5, 5) = del_x*(F_trb*V*om2*ups_T*(-V*c_kap_ad*nabla - c_dif + eta*( &
       l_i + 2)
 A(6, 5) = del_x*(F_trb*om2*ups_T*(V*alpha_egv*c_egv*nabla_ad + V* &
       c_eps_ad - alpha_hfl*c_rad*lambda*nabla_ad/nabla + eta*f_conv)/( &
-      F_trb*V_g*alpha_gam*om2 - F_trb*lambda - om2) + alpha_egv*c_egv + &
-      alpha_thm*c_thk*i_omega_c + c_eps_S - alpha_hfl*c_rad*lambda/(V* &
-      nabla))
+      F_trb*V_g*alpha_gam*om2 - F_trb*lambda - om2) + alpha_egv*c_egv - &
+      alpha_hfc*c_hfc*lambda + alpha_thm*c_thk*i_omega_c + c_eps_S - &
+      alpha_hfl*c_rad*lambda/(V*nabla))
 A(1, 6) = 0
 A(2, 6) = 0
 A(3, 6) = 0
