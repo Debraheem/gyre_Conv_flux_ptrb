@@ -252,6 +252,12 @@ available:
    :math:`\delta\nabla`, and :math:`\delta A`. Otherwise it uses the default
    two-by-two solve for :math:`\delta\nabla` and :math:`\delta A`.
 
+   This option applies to radial and nonradial modes. The implemented
+   pressure row contains a background gradient term absent from the
+   Lagrangian pressure identity. The background mechanical coefficients and
+   pressure boundary retain the standard GYRE expressions. See
+   :ref:`osc-conv` for the equations and restrictions.
+
 .. nml:option:: deps_scheme
    :type: string
    :default: 'MODEL'

@@ -97,7 +97,8 @@ the turbulent-pressure inertia/work correction.
 When :nml:option:`tdc_perturb_mlt_Pturb <osc.tdc_perturb_mlt_Pturb>` is
 :nml:value:`.FALSE.`, the local TDC branch uses the two-by-two system. When the
 option is :nml:value:`.TRUE.` and :math:`P_{{\rm turb},0}` is nonzero, the local
-variables include separate total-pressure and EOS-pressure perturbations:
+routine uses separate pressure variables for radial and nonradial modes.
+Define the Lagrangian variables
 
 .. math::
 
@@ -119,7 +120,7 @@ With
    \beta_{\rm turb} = P_{{\rm turb},0}/P_{\rm eos}, \qquad
    D_{\rm turb} = \deriv{\ln P_{{\rm turb},0}}{\ln r},
 
-the local pressure split is
+the implemented pressure split is
 
 .. math::
 
@@ -148,11 +149,61 @@ this gives a local three-by-three system for :math:`q_{2{\rm eos}}`,
 :math:`q_{2{\rm tot}}`. The EOS, buoyancy, Poisson density source, and thermal
 source terms use :math:`q_{2{\rm eos}}`.
 
+.. warning::
+
+   The implemented pressure split differs from the Lagrangian pressure
+   identity. Eulerian and Lagrangian perturbations satisfy
+
+   .. math::
+
+      P'_i = \delta P_i - \xi_r \deriv{P_{i,0}}{r}.
+
+   The :math:`-D_{\rm turb}q_1` term belongs in this conversion, not in
+   :math:`\delta P_{\rm tot}=\delta P_{\rm eos}+\delta P_{\rm turb}`.
+   With the Lagrangian definitions above, the pressure row is
+
+   .. math::
+
+      \left(1+\frac{\beta_{\rm turb}}{\Gamma_1}\right)q_{2{\rm eos}}
+      + \frac{2\beta_{\rm turb}}{A_0}\delta A
+      = q_{2{\rm tot}}+\beta_{\rm turb}\upsT q_S.
+
+   Hydrostatic equilibrium with turbulent pressure has
+   :math:`dP_{\rm eos}/dr=-\rho g-dP_{\rm turb}/dr`.
+   The background mechanical coefficients and pressure boundary still
+   use the standard GYRE expressions. The corresponding total pressure
+   terms are not included.
+
 The local linearization holds :math:`c_P`, :math:`H_P`,
-:math:`\alpha_{\rm MLT}`, :math:`\nabla_{\rm L}`, :math:`\nabla_{\rm ad}`, and
+:math:`\nabla_{\rm L}`, :math:`\nabla_{\rm ad}`, and
 the reconstructed ratio :math:`Y_{\rm env}/Y` fixed at their profile values.
 It includes the exported opacity derivatives in the radiative and TDC damping
 terms.
+
+For the ordinary mixing length, :math:`\alpha_{\rm MLT}` is constant in
+both GYRE and MESA's radial ``star_LNA`` calculation. The omitted responses
+are derivatives of the closure factors, not perturbations of that parameter.
+For example, the full MLT-correction differential is
+
+.. math::
+
+   \delta Y_{\rm env}
+   = \frac{\Gamma}{1+\Gamma}(\delta\nabla-\delta\nabla_{\rm L})
+   + \frac{Y}{(1+\Gamma)^2}\delta\Gamma.
+
+The local GYRE approximation retains only
+:math:`[Y_{\rm env}/Y]\delta\nabla`. MESA also differentiates
+:math:`c_P`, the scale height and mixing length, and
+:math:`\nabla_{\rm ad}` inside the nonlinear convection closure. The
+efficiency response depends on EOS derivatives of :math:`\chi_T` and
+:math:`\chi_\rho`. These independent thermodynamic derivatives are not
+provided by the current schema-130 background columns and cannot generally
+be inferred from radial profile slopes.
+
+In an already linearized EOS identity, coefficient perturbations multiply
+another first order perturbation and are discarded. Within the nonlinear
+convection closure, these coefficients multiply nonzero equilibrium factors,
+so their differentials contribute at first order.
 
 The current local TDC branch cannot be combined with
 :nml:option:`alpha_trb <osc.alpha_trb>` or with inhomogeneous forcing. GYRE
@@ -163,6 +214,17 @@ The standard MESA structure coefficients in the model continue to use
 perturbation split, but it does not reconstruct background hydrostatic
 coefficients or the outer pressure boundary condition using
 :math:`P_{\rm tot}`.
+
+The local TDC equations do not use the exported ``tdc_alpha_M`` coefficient
+to compute eddy viscosity, for either radial or nonradial modes. They also
+omit the optional turbulent-energy storage term included by MESA when
+``TDC_include_eturb_in_energy_equation`` and
+``star_LNA_perturb_turbulent_energy`` are enabled. In the continuous limit,
+:math:`e_{\rm turb}=A^2` and :math:`\delta e_{\rm turb}=2A_0\delta A`.
+
+Harmonic mixing-length support is deferred. Current matched MESA comparisons
+require ``harmonic_dissipation_length_beta = 0`` and use
+:math:`\Lambda=\alpha_{\rm MLT}H_P`.
 
 .. _osc-conv-turb:
 
@@ -188,7 +250,7 @@ evaluated as
 
 .. math::
 
-   \nu = \frac{L^{2}}{\tconv} 
+   \nu = \frac{L^{2}}{\tconv}
    \left[ 1 + \left( \tconv \frac{\sigma}{2\pi} \right)^{\alphacon} \right]^{-1},
 
 where :math:`L` is the mixing length, and :math:`\tconv` is the local
