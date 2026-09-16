@@ -98,13 +98,13 @@ When :nml:option:`tdc_perturb_mlt_Pturb <osc.tdc_perturb_mlt_Pturb>` is
 :nml:value:`.FALSE.`, the local TDC branch uses the two-by-two system. When the
 option is :nml:value:`.TRUE.` and :math:`P_{{\rm turb},0}` is nonzero, the local
 routine uses separate pressure variables for radial and nonradial modes.
-Define the Lagrangian variables
+Define the pressure coordinate and EOS variables, with :math:`p=x^{\ell-2}`,
 
 .. math::
 
    q_{1} = \xi_{r}/r, \qquad
    q_{S} = \delta S/c_{P}, \qquad
-   q_{2{\rm tot}} = \delta P_{\rm tot}/P_{\rm eos}, \qquad
+   q_{2{\rm tot}} = pV(y_2-y_1), \qquad
    q_{2{\rm eos}} = \delta P_{\rm eos}/P_{\rm eos}.
 
 The density perturbation obtained from the EOS is
@@ -149,30 +149,30 @@ this gives a local three-by-three system for :math:`q_{2{\rm eos}}`,
 :math:`q_{2{\rm tot}}`. The EOS, buoyancy, Poisson density source, and thermal
 source terms use :math:`q_{2{\rm eos}}`.
 
-.. warning::
+Primes denote Eulerian perturbations and :math:`\delta` denotes Lagrangian
+perturbations. Since
 
-   The implemented pressure split differs from the Lagrangian pressure
-   identity. Eulerian and Lagrangian perturbations satisfy
+.. math::
 
-   .. math::
+   P'_{\rm turb}=\delta P_{\rm turb}-\xi_r\deriv{P_{{\rm turb},0}}{r},
 
-      P'_i = \delta P_i - \xi_r \deriv{P_{i,0}}{r}.
+the local split uses :math:`q_{2{\rm tot}}` as the mixed combination
+:math:`(\delta P_{\rm eos}+P'_{\rm turb})/P_{\rm eos}`, not as the
+all-Lagrangian total pressure. It equals :math:`pV(y_2-y_1)` for total
+Eulerian :math:`y_2` when :math:`dP_{{\rm eos},0}/dr=-\rho g`.
+For total-pressure equilibrium, the same coordinate instead equals
+:math:`\delta P_{\rm tot}/P_{\rm eos}`. The local solve does not replace
+the standard GYRE background or pressure boundary conditions.
 
-   The :math:`-D_{\rm turb}q_1` term belongs in this conversion, not in
-   :math:`\delta P_{\rm tot}=\delta P_{\rm eos}+\delta P_{\rm turb}`.
-   With the Lagrangian definitions above, the pressure row is
+After the local solve, set
 
-   .. math::
+.. math::
 
-      \left(1+\frac{\beta_{\rm turb}}{\Gamma_1}\right)q_{2{\rm eos}}
-      + \frac{2\beta_{\rm turb}}{A_0}\delta A
-      = q_{2{\rm tot}}+\beta_{\rm turb}\upsT q_S.
+   d=\frac{q_{2{\rm eos}}-q_{2{\rm tot}}}{pV}.
 
-   Hydrostatic equilibrium with turbulent pressure has
-   :math:`dP_{\rm eos}/dr=-\rho g-dP_{\rm turb}/dr`.
-   The background mechanical coefficients and pressure boundary still
-   use the standard GYRE expressions. The corresponding total pressure
-   terms are not included.
+The change in :math:`\delta\rho/(p\rho)` is :math:`(V/\Gamma_1)d`.
+The radial momentum row therefore receives :math:`-(V/\Gamma_1)d`.
+Both normal and transposed matrix evaluations use this coefficient.
 
 The local linearization holds :math:`c_P`, :math:`H_P`,
 :math:`\nabla_{\rm L}`, :math:`\nabla_{\rm ad}`, and
