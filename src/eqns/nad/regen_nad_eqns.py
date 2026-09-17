@@ -86,7 +86,7 @@ A = sp.Matrix([
      alpha_grv*(V*nabla_ad)/f_rht,
      V*nabla*(4*f_rht - c_kap_S)/f_rht - df_rht - (l_i - 2),
      -V*nabla/(c_rad*f_rht)],
-    [alpha_hfl*lamda*(nabla_ad/nabla - 1)*c_rad - V*c_eps_ad - alpha_egv*c_egv*nabla_ad*V,
+    [alpha_hfl*lamda*(nabla_ad/nabla - 1)*c_rad - alpha_hfc*lamda*c_conv - V*c_eps_ad - alpha_egv*c_egv*nabla_ad*V,
      V*c_eps_ad - lamda*c_rad*alpha_hfl*nabla_ad/nabla + lamda*f_conv/(c_1(x)*alpha_omg*omega_c**2) + alpha_egv*c_egv*nabla_ad*V,
      alpha_grv*lamda*f_conv/(c_1(x)*alpha_omg*omega_c**2),
      0,

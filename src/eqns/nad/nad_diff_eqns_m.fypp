@@ -64,6 +64,7 @@ module ${P}$_nad_diff_eqns_m
       real(RD)                 :: c_rad
       real(RD)                 :: dc_rad
       real(RD)                 :: c_hfc
+      real(RD)                 :: c_conv
       real(RD)                 :: c_thn
       real(RD)                 :: dc_thn
       real(RD)                 :: c_thk
@@ -148,9 +149,11 @@ contains
       de%c_rad = ml%coeff(I_C_RAD, pt)
       de%dc_rad = ml%dcoeff(I_C_RAD, pt)
       de%c_hfc = 0._RD
+      de%c_conv = 0._RD
       if (cx%alpha_hfc /= 0._RD) then
-         call check_model(ml, [I_TDC_C_HFC])
+         call check_model(ml, [I_TDC_C_HFC,I_TDC_C_CONV])
          de%c_hfc = ml%coeff(I_TDC_C_HFC, pt)
+         de%c_conv = ml%coeff(I_TDC_C_CONV, pt)
       end if
       de%c_thn = ml%coeff(I_C_THN, pt)
       de%dc_thn = ml%dcoeff(I_C_THN, pt)
@@ -293,6 +296,7 @@ contains
          c_rad => this%c_rad, &
          dc_rad => this%dc_rad, &
          c_hfc => this%c_hfc, &
+         c_conv => this%c_conv, &
          c_thn => this%c_thn, &
          dc_thn => this%dc_thn, &
          c_thk => this%c_thk, &

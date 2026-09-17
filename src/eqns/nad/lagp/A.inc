@@ -35,8 +35,9 @@ A(3, 5) = V*alpha_grv*del_x*eta*(-nabla + nabla_ad)/f_rht
 A(4, 5) = V*alpha_grv*del_x*nabla_ad/f_rht
 A(5, 5) = del_x*(V*nabla*(-c_kap_S + 4*f_rht)/f_rht - df_rht - l_i + 2)
 A(6, 5) = -V*del_x*nabla/(c_rad*f_rht)
-A(1, 6) = del_x*(alpha_hfl*c_rad*lambda*(-1 + nabla_ad/nabla) - &
-      alpha_hfl*c_rad*lambda*nabla_ad/nabla + eta*f_conv)
+A(1, 6) = del_x*(-alpha_hfc*c_conv*lambda + alpha_hfl*c_rad*lambda*(-1 + &
+      nabla_ad/nabla) - alpha_hfl*c_rad*lambda*nabla_ad/nabla + eta* &
+      f_conv)
 A(2, 6) = del_x*(V*alpha_egv*c_egv*nabla_ad + V*c_eps_ad - alpha_hfl* &
       c_rad*lambda*nabla_ad/nabla + eta*f_conv)/V_2
 A(3, 6) = alpha_grv*del_x*eta*f_conv
@@ -53,8 +54,9 @@ A(4, 1) = del_x*(As*U + U*V_g)
 A(5, 1) = del_x*(V*(-V*c_kap_ad*nabla - c_dif + eta*(-nabla + nabla_ad)) &
       /f_rht + V*(V*c_kap_ad*nabla + c_dif + 4*nabla + nabla_ad*(U - &
       om2) - 4*nabla_ad)/f_rht)
-A(6, 1) = del_x*(alpha_hfl*c_rad*lambda*(-1 + nabla_ad/nabla) - &
-      alpha_hfl*c_rad*lambda*nabla_ad/nabla + eta*f_conv)
+A(6, 1) = del_x*(-alpha_hfc*c_conv*lambda + alpha_hfl*c_rad*lambda*(-1 + &
+      nabla_ad/nabla) - alpha_hfl*c_rad*lambda*nabla_ad/nabla + eta* &
+      f_conv)
 A(1, 2) = del_x*(-V_g*alpha_gam + eta)/V_2
 A(2, 2) = del_x*(V_2*(dV_2/V_2 + (As - U - l_i + 3)/V_2) + V_g*alpha_gam &
       - eta)

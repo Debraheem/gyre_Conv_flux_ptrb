@@ -159,6 +159,7 @@ module model_m
    public :: I_TDC_A0
    public :: I_TDC_D_H
    public :: I_TDC_C_HFC
+   public :: I_TDC_C_CONV
    public :: I_TDC_HP
    public :: I_TDC_ALPHA_MLT
    public :: I_TDC_CP

@@ -37,15 +37,36 @@ Horizontal Convective Heat Flux
 -------------------------------
 
 For MESA-format version-1.30 models, GYRE can include the horizontal component
-of the isotropic convective heat-flux perturbation. The closure is
+of the isotropic convective heat-flux perturbation. The scalar diffusion law
+is :math:`\vF_{\rm conv}=-\rho T D_{{\rm conv},h}\nabla S`. Its Eulerian
+horizontal perturbation is
 
 .. math::
 
-   \delta \vF_{{\rm conv},h} = - \rho T D_{{\rm conv},h} \nabla_h \delta S,
+   \vF'_{{\rm conv},h} = - \rho T D_{{\rm conv},h} \nabla_h S',
+   \qquad S'=\delta S-\xi_r\deriv{S_0}{r}.
 
-This contributes :math:`-\alphahfc \lambda \chfc y_5` to the :math:`y_6`
-equation. It vanishes for radial modes. The :nml:option:`alpha_hfc
-<osc.alpha_hfc>` option scales the term.
+For separated amplitudes, the Lagrangian flux is
+
+.. math::
+
+   \delta F_{{\rm conv},h}
+   =-\frac{\rho T D_{{\rm conv},h}}{r}\delta S
+    +\frac{F_{{\rm conv},0}}{r}(\xi_h-\xi_r).
+
+The heat equation cancels the :math:`\xi_h` projection term and retains
+
+.. math::
+
+   H_{{\rm conv},h}
+   =-\lambda\frac{TD_{{\rm conv},h}}{r^2}\delta S
+    -\lambda\frac{F_{{\rm conv},0}}{\rho r^2}\xi_r.
+
+This contributes :math:`-\alphahfc\lambda(\chfc y_5+c_{\rm conv}y_1)` to
+the :math:`y_6` equation, where
+:math:`c_{\rm conv}=L_{{\rm conv},0}/(L_\star x^3)` uses the exported
+convective luminosity. Both terms vanish for radial modes. The
+:nml:option:`alpha_hfc <osc.alpha_hfc>` option scales both terms.
 
 The horizontal term can be used with either frozen-convection scheme. With
 :nml:option:`conv_scheme <osc.conv_scheme>` set to

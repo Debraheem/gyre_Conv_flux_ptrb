@@ -221,6 +221,8 @@ contains
          i = I_TDC_D_H
       case ('tdc_c_hfc')
          i = I_TDC_C_HFC
+      case ('tdc_c_conv')
+         i = I_TDC_C_CONV
       case ('tdc_Hp')
          i = I_TDC_HP
       case ('tdc_alpha_mlt')
@@ -355,6 +357,8 @@ contains
          name = 'tdc_D_h'
       case (I_TDC_C_HFC)
          name = 'tdc_c_hfc'
+      case (I_TDC_C_CONV)
+         name = 'tdc_c_conv'
       case (I_TDC_HP)
          name = 'tdc_Hp'
       case (I_TDC_ALPHA_MLT)

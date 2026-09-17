@@ -208,6 +208,7 @@ contains
       real(RD), allocatable       :: tdc_A0(:)
       real(RD), allocatable       :: tdc_D_h(:)
       real(RD), allocatable       :: tdc_c_hfc(:)
+      real(RD), allocatable       :: tdc_c_conv(:)
       real(RD), allocatable       :: tdc_Hp(:)
       real(RD), allocatable       :: tdc_alpha_mlt(:)
       real(RD), allocatable       :: tdc_Cp(:)
@@ -293,11 +294,15 @@ contains
          tdc_rho = rho
          tdc_kap = kap
          allocate(tdc_c_hfc(n))
+         allocate(tdc_c_conv(n))
          tdc_c_hfc = 0._RD
+         tdc_c_conv = 0._RD
          t_dyn = sqrt(R_star**3/(G_GRAVITY*M_star))
          do j = 1,n
-            if (x(j) > 0._RD .AND. tdc_A0(j) > 0._RD) &
+            if (x(j) > 0._RD .AND. tdc_A0(j) > 0._RD) then
                tdc_c_hfc(j) = c_thk(j)*tdc_D_h(j)*t_dyn/r(j)**2
+               tdc_c_conv(j) = (tdc_L_conv0(j)/L_star)/x(j)**3
+            end if
          end do
       end if
 
@@ -360,6 +365,7 @@ contains
          call ml%define(I_TDC_A0, tdc_A0)
          call ml%define(I_TDC_D_H, tdc_D_h)
          call ml%define(I_TDC_C_HFC, tdc_c_hfc)
+         call ml%define(I_TDC_C_CONV, tdc_c_conv)
          call ml%define(I_TDC_HP, tdc_Hp)
          call ml%define(I_TDC_ALPHA_MLT, tdc_alpha_mlt)
          call ml%define(I_TDC_CP, tdc_Cp)

@@ -58,11 +58,11 @@ A(5, 5) = del_x*(F_trb*V*om2*ups_T*(-V*c_kap_ad*nabla - c_dif + eta*( &
       lambda - om2)) + V*nabla*(-c_kap_S + 4*f_rht)/f_rht - df_rht - &
       l_i + 2)
 A(6, 5) = -V*del_x*nabla/(c_rad*f_rht)
-A(1, 6) = del_x*(-V*alpha_egv*c_egv*nabla_ad - V*c_eps_ad + alpha_hfl* &
-      c_rad*lambda*(-1 + nabla_ad/nabla) + (F_trb*V_g*om2 - 2*F_trb*om2 &
-      )*(V*alpha_egv*c_egv*nabla_ad + V*c_eps_ad - alpha_hfl*c_rad* &
-      lambda*nabla_ad/nabla + eta*f_conv)/(F_trb*V_g*alpha_gam*om2 - &
-      F_trb*lambda - om2))
+A(1, 6) = del_x*(-V*alpha_egv*c_egv*nabla_ad - V*c_eps_ad - alpha_hfc* &
+      c_conv*lambda + alpha_hfl*c_rad*lambda*(-1 + nabla_ad/nabla) + ( &
+      F_trb*V_g*om2 - 2*F_trb*om2)*(V*alpha_egv*c_egv*nabla_ad + V* &
+      c_eps_ad - alpha_hfl*c_rad*lambda*nabla_ad/nabla + eta*f_conv)/( &
+      F_trb*V_g*alpha_gam*om2 - F_trb*lambda - om2))
 A(2, 6) = -del_x*om2*(V*alpha_egv*c_egv*nabla_ad + V*c_eps_ad - &
       alpha_hfl*c_rad*lambda*nabla_ad/nabla + eta*f_conv)/(F_trb*V_g* &
       alpha_gam*om2 - F_trb*lambda - om2)
@@ -91,11 +91,11 @@ A(5, 1) = del_x*(V*(F_trb*V_g*om2 - 2*F_trb*om2)*(-V*c_kap_ad*nabla - &
       c_dif + eta*(-nabla + nabla_ad))/(f_rht*(F_trb*V_g*alpha_gam*om2 &
       - F_trb*lambda - om2)) + V*(V*c_kap_ad*nabla + c_dif + 4*nabla + &
       nabla_ad*(U - om2) - 4*nabla_ad)/f_rht)
-A(6, 1) = del_x*(-V*alpha_egv*c_egv*nabla_ad - V*c_eps_ad + alpha_hfl* &
-      c_rad*lambda*(-1 + nabla_ad/nabla) + (F_trb*V_g*om2 - 2*F_trb*om2 &
-      )*(V*alpha_egv*c_egv*nabla_ad + V*c_eps_ad - alpha_hfl*c_rad* &
-      lambda*nabla_ad/nabla + eta*f_conv)/(F_trb*V_g*alpha_gam*om2 - &
-      F_trb*lambda - om2))
+A(6, 1) = del_x*(-V*alpha_egv*c_egv*nabla_ad - V*c_eps_ad - alpha_hfc* &
+      c_conv*lambda + alpha_hfl*c_rad*lambda*(-1 + nabla_ad/nabla) + ( &
+      F_trb*V_g*om2 - 2*F_trb*om2)*(V*alpha_egv*c_egv*nabla_ad + V* &
+      c_eps_ad - alpha_hfl*c_rad*lambda*nabla_ad/nabla + eta*f_conv)/( &
+      F_trb*V_g*alpha_gam*om2 - F_trb*lambda - om2))
 A(1, 2) = -del_x*om2*(-V_g*alpha_gam + eta)/(F_trb*V_g*alpha_gam*om2 - &
       F_trb*lambda - om2)
 A(2, 2) = -del_x*om2*(As + F_trb*(-V_g*alpha_gam + eta)*(As - U + V_g - &

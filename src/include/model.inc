@@ -24,7 +24,8 @@
     'tdc_L_conv0', 'tdc_A0', 'tdc_D_h', 'tdc_c_hfc', 'tdc_Hp', 'tdc_alpha_mlt', &
     'tdc_Cp', 'tdc_chiT', 'tdc_chiRho', 'tdc_gradL', 'tdc_gradT', &
     'tdc_alpha_C', 'tdc_alpha_S', 'tdc_alpha_D', 'tdc_alpha_R', 'tdc_alpha_Pt', &
-    'tdc_alpha_M', 'tdc_include_mlt_corr', 'tdc_mlt_Pturb_factor', 'tdc_mlt_Pturb0')
+    'tdc_alpha_M', 'tdc_include_mlt_corr', 'tdc_mlt_Pturb_factor', 'tdc_mlt_Pturb0', &
+    'tdc_c_conv')
 
 #!!! Canonical coefficient index names
 

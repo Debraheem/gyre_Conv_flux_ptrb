@@ -55,6 +55,7 @@ c_eps_S = sp.Symbol('c_eps_S')
 c_dif = sp.Symbol('c_dif')
 c_rad = sp.Symbol('c_rad')
 c_hfc = sp.Symbol('c_hfc')
+c_conv = sp.Symbol('c_conv')
 c_thk = sp.Symbol('c_thk')
 c_egv = sp.Symbol('c_egv')
 

@@ -184,6 +184,7 @@ contains
       type(prox_t), intent(out) :: pr(:)
 
       integer :: i
+      complex(RD) :: domega
 
       @:CHECK_BOUNDS(SIZE(omega_b), SIZE(omega_a))
       @:CHECK_BOUNDS(SIZE(id), SIZE(omega_a))
@@ -191,11 +192,19 @@ contains
 
       ! Set up the prox array
 
-      !$OMP DO
+      !$OMP DO PRIVATE(domega)
       do i = 1, SIZE(pr)
 
          pr(i)%omega_a = omega_a(i)
          pr(i)%omega_b = omega_b(i)
+
+         ! Separate coincident seeds as in the single-frequency search
+
+         if (pr(i)%omega_a == pr(i)%omega_b) then
+            domega = sqrt(EPSILON(0._RD))*abs(omega_a(i))*CMPLX(0._RD, 1._RD, KIND=RD)
+            pr(i)%omega_a = omega_a(i) + domega
+            pr(i)%omega_b = omega_b(i) - domega
+         endif
 
          pr(i)%omega_r = real(0.5_RD*(pr(i)%omega_a + pr(i)%omega_b))
 
@@ -652,7 +661,7 @@ contains
       ! Process the modes in order
 
       !$OMP DO ORDERED PRIVATE(md, culled) SCHEDULE(STATIC, 1)
-      prox_loop: do i = 1, COUNT(pr%active)
+      prox_loop: do i = 1, SIZE(pr)
 
          if (.NOT. pr(i)%active) cycle prox_loop
 
