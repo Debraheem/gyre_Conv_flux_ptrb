@@ -64,6 +64,7 @@ module wave_m
       type(point_t)            :: pt_o
       logical                  :: is_vacuum
       complex(RD), allocatable :: y_c(:,:)
+      complex(RD), allocatable :: xi_h_c(:)
       complex(RD), public      :: scl
       complex(RD), public      :: omega
       complex(RD), public      :: l_i
@@ -160,7 +161,7 @@ module wave_m
 
 contains
 
-   function wave_t_(st, y_c, cx, gr, md_p, nm_p, os_p, id, chi, n_iter) result(wv)
+   function wave_t_(st, y_c, cx, gr, md_p, nm_p, os_p, id, chi, n_iter, xi_h_c) result(wv)
 
       type(state_ct), intent(in)    :: st
       complex(RD), intent(in)       :: y_c(:,:)
@@ -172,6 +173,7 @@ contains
       integer, intent(in)           :: id
       real(RD), intent(in)          :: chi
       integer, intent(in)           :: n_iter
+      complex(RD), intent(in), optional :: xi_h_c(:)
       type(wave_t)                  :: wv
 
       real(RD) :: x_ref
@@ -190,6 +192,10 @@ contains
       wv%os_p = os_p
 
       wv%y_c = y_c
+      if (PRESENT(xi_h_c)) then
+         @:CHECK_BOUNDS(SIZE(xi_h_c), gr%n)
+         wv%xi_h_c = xi_h_c
+      end if
 
       wv%omega = st%omega
 
@@ -575,6 +581,11 @@ contains
 
       ! Evaluate the horizontal displacement perturbation, in units of
       ! R_star
+
+      if (ALLOCATED(this%xi_h_c)) then
+         xi_h = this%scl*this%xi_h_c(j)
+         return
+      end if
 
       if (this%l /= 0) then
 

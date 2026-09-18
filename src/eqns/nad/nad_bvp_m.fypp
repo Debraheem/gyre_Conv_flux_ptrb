@@ -37,6 +37,7 @@ module nad_bvp_m
    use resp_m
    use state_m
    use sysmtx_m
+   use tdc_visc_m
    use trans_m
    use wave_m
 
@@ -60,6 +61,7 @@ module nad_bvp_m
       type(mode_par_t)             :: md_p
       type(num_par_t)              :: nm_p
       type(osc_par_t)              :: os_p
+      type(tdc_visc_pt_t), allocatable :: visc_pt(:)
    end type nad_bvp_t
 
    ! Interfaces
@@ -103,6 +105,7 @@ contains
 
       class(bound_conds_ct), allocatable :: bc_i
       class(bound_conds_ct), allocatable :: bc_o
+      type(tdc_visc_bound_t) :: visc_bc_i, visc_bc_o
       class(model_t), pointer            :: ml
       integer                            :: j
 
@@ -113,7 +116,19 @@ contains
       bc_i = nad_ibound_conds_t(cx, os_p)
       bc_o = nad_obound_conds_t(cx, os_p)
 
-      bp%bvp_ct = bvp_ct(gr, bc_i, bc_o, diff_eqns_factory_, match_conds_factory_, nm_p)
+      if (tdc_visc_enabled(cx, gr, os_p, nm_p)) then
+         allocate(bp%visc_pt(gr%n))
+         !$OMP PARALLEL DO
+         do j = 1, gr%n
+            bp%visc_pt(j) = tdc_visc_pt_t(cx, gr%pt(j), os_p)
+         end do
+         visc_bc_i = tdc_visc_bound_t(bc_i, bp%visc_pt(1), .TRUE., &
+            0.5_RD*(gr%pt(2)%x-gr%pt(1)%x), os_p%outer_bound)
+         visc_bc_o = tdc_visc_bound_t(bc_o, bp%visc_pt(gr%n), .FALSE., 0._RD, os_p%outer_bound)
+         bp%bvp_ct = bvp_ct(gr, visc_bc_i, visc_bc_o, diff_eqns_factory_, match_conds_factory_, nm_p, visc_block_factory_)
+      else
+         bp%bvp_ct = bvp_ct(gr, bc_i, bc_o, diff_eqns_factory_, match_conds_factory_, nm_p)
+      end if
 
       ! Store coefficients needed to evaluate y_trb
 
@@ -150,11 +165,13 @@ contains
       bp%cx => cx
       bp%gr = gr
 
-      #:if defined('GFORTRAN_PR125610')
-      bp%tr = nad_trans_t_1_(cx, gr%pt, os_p)
-      #:else
-      bp%tr = nad_trans_t(cx, gr%pt, os_p)
-      #:endif
+      if (.NOT. ALLOCATED(bp%visc_pt)) then
+         #:if defined('GFORTRAN_PR125610')
+         bp%tr = nad_trans_t_1_(cx, gr%pt, os_p)
+         #:else
+         bp%tr = nad_trans_t(cx, gr%pt, os_p)
+         #:endif
+      end if
 
       bp%md_p = md_p
       bp%nm_p = nm_p
@@ -165,6 +182,19 @@ contains
       return
 
    contains
+
+      subroutine visc_block_factory_(j, ib)
+
+         use inter_block_m
+
+         integer, intent(in) :: j
+         class(inter_block_ct), allocatable, intent(out) :: ib
+
+         ib = tdc_visc_block_t(cx, gr, j, os_p)
+
+      end subroutine visc_block_factory_
+
+      !****
 
       subroutine diff_eqns_factory_(pt, de)
 
@@ -226,15 +256,38 @@ contains
       integer      :: j
       complex(RD)  :: Q(6,6)
       type(wave_t) :: wv
+      complex(RD), allocatable :: z(:,:), xi_h(:)
+      complex(RD) :: h
+      real(RD) :: dx_h, w_h
 
       ! Calculate the homogeneous solution vector
 
-      call bp%solve_hom(sm, st, y)
-
-      !$OMP PARALLEL DO
-      do j = 1, bp%n
-         call bp%tr(j)%transform(st, y(:,j))
-      end do
+      if (ALLOCATED(bp%visc_pt)) then
+         allocate(z(bp%n_e,bp%n), xi_h(bp%n))
+         call bp%solve_hom(sm, st, z)
+         !$OMP PARALLEL DO PRIVATE(h,dx_h,w_h)
+         do j = 1, bp%n
+            h = 0._RD
+            if (bp%n_e == 8) then
+               if (j == 1) then
+                  dx_h = 0.5_RD*(bp%gr%pt(2)%x-bp%gr%pt(1)%x)/bp%gr%pt(1)%x
+                  h = (z(7,1)+dx_h*z(1,1))/(1._RD-(bp%md_p%l-2)*dx_h)
+               else if (j == bp%n) then
+                  h = z(7,j)
+               else
+                  w_h = (bp%gr%pt(j+1)%x-bp%gr%pt(j)%x)/(bp%gr%pt(j+1)%x-bp%gr%pt(j-1)%x)
+                  h = w_h*z(7,j-1)+(1._RD-w_h)*z(7,j)
+               end if
+            end if
+            call tdc_visc_transform(bp%visc_pt(j), st, z(:,j), h, y(:,j), xi_h(j))
+         end do
+      else
+         call bp%solve_hom(sm, st, y)
+         !$OMP PARALLEL DO
+         do j = 1, bp%n
+            call bp%tr(j)%transform(st, y(:,j))
+         end do
+      end if
 
       ! Subtract off the turbulent pressure
 
@@ -250,7 +303,11 @@ contains
 
       ! Construct the mode_t
 
-      wv = wave_t(st, y, bp%cx, bp%gr, bp%md_p, bp%nm_p, bp%os_p, id, chi, n_iter)
+      if (ALLOCATED(xi_h)) then
+         wv = wave_t(st, y, bp%cx, bp%gr, bp%md_p, bp%nm_p, bp%os_p, id, chi, n_iter, xi_h)
+      else
+         wv = wave_t(st, y, bp%cx, bp%gr, bp%md_p, bp%nm_p, bp%os_p, id, chi, n_iter)
+      end if
 
       md = mode_t(wv)
 
@@ -279,6 +336,7 @@ contains
 
       ! Calculate the inhomogeneous solution vector
 
+      @:ASSERT(.NOT. ALLOCATED(bp%visc_pt), 'eddy viscosity does not support inhomogeneous forcing')
       call bp%solve_inhom(sm, st, y)
 
       !$OMP PARALLEL DO

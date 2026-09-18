@@ -38,8 +38,35 @@ Horizontal Convective Heat Flux
 
 For MESA-format version-1.30 models, GYRE can include the horizontal component
 of the isotropic convective heat-flux perturbation. The scalar diffusion law
-is :math:`\vF_{\rm conv}=-\rho T D_{{\rm conv},h}\nabla S`. Its Eulerian
-horizontal perturbation is
+is :math:`\vF_{\rm conv}=-\rho T D_{{\rm conv},h}\nabla S`, where
+:math:`S` is specific entropy. The background entropy diffusivity
+:math:`D_h\equiv D_{{\rm conv},h}` is exported as ``tdc_D_h`` in
+units of :math:`\mathrm{cm^2\,s^{-1}}`. MESA infers it from
+
+.. math::
+
+   D_h=\frac{L_{{\rm conv},0}H_P}
+   {4\pi r^2\rho T c_P(\nabla_T-\nabla_L)}.
+
+This value is zero unless the numerator and denominator are positive.
+For uniform composition the radial entropy gradient is
+:math:`\deriv{S_0}{r}=-c_P(\nabla_T-\nabla_{\rm ad})/H_P`.
+Thus the radial closure uses the same scalar diffusivity; its explicit
+:math:`c_P/H_P` comes from the entropy gradient.
+
+The horizontal spatial gradient is
+
+.. math::
+
+   \nabla_h=\frac{\hat{\boldsymbol\theta}}{r}\frac{\partial}{\partial\theta}
+   +\frac{\hat{\boldsymbol\phi}}{r\sin\theta}\frac{\partial}{\partial\phi}
+   =\frac{1}{r}\nabla_\Omega.
+
+It has units of inverse length; :math:`\nabla_\Omega` is the dimensionless
+angular gradient on the unit sphere. For a separated scalar amplitude,
+:math:`\nabla_h(fY_{\ell m})=(f/r)\nabla_\Omega Y_{\ell m}`. This is
+distinct from the dimensionless temperature gradient :math:`\nabla_T`.
+The Eulerian horizontal flux perturbation is
 
 .. math::
 
@@ -236,9 +263,9 @@ perturbation split, but it does not reconstruct background hydrostatic
 coefficients or the outer pressure boundary condition using
 :math:`P_{\rm tot}`.
 
-The local TDC equations do not use the exported ``tdc_alpha_M`` coefficient
-to compute eddy viscosity, for either radial or nonradial modes. They also
-omit the optional turbulent-energy storage term included by MESA when
+Eddy viscosity is selected separately through
+:nml:option:`tdc_alpha_M <osc.tdc_alpha_M>` and is described below.
+The local TDC equations omit the optional turbulent-energy storage term included by MESA when
 ``TDC_include_eturb_in_energy_equation`` and
 ``star_LNA_perturb_turbulent_energy`` are enabled. In the continuous limit,
 :math:`e_{\rm turb}=A^2` and :math:`\delta e_{\rm turb}=2A_0\delta A`.
@@ -246,6 +273,140 @@ omit the optional turbulent-energy storage term included by MESA when
 Harmonic mixing-length support is deferred. Current matched MESA comparisons
 require ``harmonic_dissipation_length_beta = 0`` and use
 :math:`\Lambda=\alpha_{\rm MLT}H_P`.
+
+.. _osc-conv-visc:
+
+Kuhfuss Eddy Viscosity
+----------------------
+
+The kinematic viscosity is
+
+.. math::
+
+   \nu_t = \alpha_M\Lambda A_0,\qquad
+   \Lambda = \alpha_{\rm MLT}H_P,\qquad
+   A_0 = \frac{\mathrm{mlt\_vc}}{\sqrt{2/3}}.
+
+The background quantities are supplied by the version-1.30 MESA
+profile. The :nml:option:`tdc_alpha_M <osc.tdc_alpha_M>` control selects
+the coefficient. No viscosity floor is applied.
+
+For pulsation velocity :math:`\mathbf u=-{\rm i}\sigma\boldsymbol\xi`,
+the trace-free strain, stress, and acceleration are
+
+.. math::
+
+   S_{ij} = \frac12(\nabla_i u_j+\nabla_j u_i)
+          -\frac13\delta_{ij}\nabla\cdot\mathbf u,\qquad
+   \tau_{ij}=2\rho\nu_t S_{ij},\qquad
+   \mathbf a_v=\rho^{-1}\nabla\cdot\boldsymbol\tau.
+
+The radial limit is
+
+.. math::
+
+   U_q = \frac{1}{\rho r^3}\deriv{}{r}
+       \left[\frac43\rho\nu_t r^3
+       \left(\deriv{u_r}{r}-\frac{u_r}{r}\right)\right],\qquad
+   E_q = \frac43\nu_t
+       \left(\deriv{u_r}{r}-\frac{u_r}{r}\right)^2.
+
+These are the radial momentum and energy transfer terms of the
+Kuhfuss closure. About a static background, the viscous force is
+first order but :math:`\delta E_q=0`. Coefficient perturbations
+multiply the zero background strain and do not enter the linear
+force. Viscous damping is included through momentum, without an
+additional first-order heating term in the local TDC solve.
+
+For nonradial modes write
+:math:`\boldsymbol\xi=rs(y_1Y_{\ell m}\hat{\mathbf r}
++h\nabla_\Omega Y_{\ell m})`, where :math:`s=x^{\ell-2}`.
+With :math:`L=\ell(\ell+1)`, define
+
+.. math::
+
+   n=\frac{\tau_{rr}}{\rho grs},\quad
+   t=\frac{\tau_{rh}}{\rho grs},\quad
+   F=\frac{{\rm i}\sigma\nu_t}{gr}.
+
+The normal and tangential tractions satisfy
+
+.. math::
+
+   n=-F\left[\frac43\left(x\deriv{y_1}{x}+(\ell-2)y_1\right)
+                     +\frac23Lh\right],\qquad
+   t=-F\left[x\deriv{h}{x}+(\ell-2)h+y_1\right].
+
+The force components are
+
+.. math::
+
+   \frac{a_{v,r}}{gs}=x\deriv{n}{x}+Kn-Lt,\qquad
+   \frac{a_{v,h}}{gs}=x\deriv{t}{x}+Kt-\frac12n-F(2-L)h,
+
+where :math:`K=U+\ell-A^*-V_g`. The traction normalization uses the
+same constrained hydrostatic derivatives as GYRE's momentum rows.
+Horizontal momentum becomes
+
+.. math::
+
+   x\deriv{t}{x}=y_2+\alpha_{\rm grv}y_3-c_1\omega^2h
+                 -Kt+\frac12n+F(2-L)h.
+
+The mechanical and thermal variables are transformed to
+:math:`z_2=y_2-n` and :math:`z_5=y_5+V\nabla_{\rm ad}n`.
+Continuity supplies the normal traction as a local algebraic relation.
+These transformations remove its derivative from radial momentum
+and the entropy-gradient equation. With :math:`C=V\nabla_{\rm ad}`,
+the entropy row retains :math:`(xC'-CK)n+CLt`. The derivative of
+:math:`C` is evaluated from its change across the grid interval.
+The transformations become the identity when viscosity vanishes.
+The other four GYRE variables are unchanged. The radial
+problem has six variables; the nonradial problem has eight.
+
+The viscous equations use second-order midpoint differences with
+horizontal displacement at interval centers and tractions at grid
+points. The tangential constitutive relation remains implicit and
+sets :math:`t=0` where :math:`\nu_t=0`; it is not divided by viscosity.
+In an inviscid interval, horizontal momentum reduces to
+
+.. math::
+
+   h=\frac{\overline{y_2}+\alpha_{\rm grv}\overline{y_3}}{c_1\omega^2},
+
+where the bar denotes the midpoint average. Its discrete row is
+divided by :math:`(\Delta x/x)c_1\omega^2`, giving :math:`h` a
+coefficient of :math:`-1`. The inviscid surface relation uses the same
+normalization. These nonzero analytic row scalings remove the
+:math:`\omega^2` determinant factors introduced by retaining the
+algebraic variables. They do not change the physical eigenvalues.
+The differential horizontal-momentum rows in viscous intervals are
+unchanged. As in the inviscid equations, :math:`\omega=0` is excluded.
+
+At a free viscous surface the boundary conditions are
+:math:`z_2-y_1=0` and :math:`t=0`. The inner boundary has
+zero radial displacement and zero tangential traction.
+The ordinary GYRE variables are recovered for output, while
+:math:`\xi_h` at viscous points is interpolated from the solved interval
+values. At inviscid points it uses the algebraic horizontal momentum
+relation. Mode inertia uses this returned displacement. Native tractions
+and interval-centered displacement are not saved in detail output.
+
+The standard ``dW_dx`` is the thermal work expression and does not include
+explicit viscous work. Differentiating point-sampled eigenfunctions across
+a zero-viscosity boundary need not recover the staggered shear used by
+the solver. A discrete viscous-work check requires the native stresses
+and consistent quadrature.
+
+Strongly nonadiabatic modes may lie far from the real adiabatic
+frequencies. Such modes can be followed from saved complex frequencies
+using :nml:option:`nad_search <num.nad_search>` = :nml:value:`'FILE'`.
+Changes in viscosity or spatial resolution require checks of mode
+identity and convergence; the determinant ratio :math:`\chi` alone
+does not provide those checks.
+
+This treatment is distinct from :nml:option:`alpha_trb <osc.alpha_trb>`
+below. The two prescriptions cannot be combined.
 
 .. _osc-conv-turb:
 

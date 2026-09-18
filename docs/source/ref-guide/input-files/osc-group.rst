@@ -258,6 +258,34 @@ available:
    boundary retain the standard GYRE expressions. See
    :ref:`osc-conv` for the equations and restrictions.
 
+.. nml:option:: tdc_alpha_M
+   :type: real
+   :default: 0.
+
+   Kuhfuss eddy-viscosity coefficient for nonadiabatic modes.
+   Zero disables viscosity. A value of -1 uses ``tdc_alpha_M`` from
+   the loaded version-1.30 MESA profile. A positive value overrides
+   the profile coefficient; for example, ``tdc_alpha_M = 0.25d0``.
+   Other negative values are invalid. The viscosity is zero wherever
+   the exported convective velocity is zero.
+
+   Both radial and nonradial forces are included. This option is
+   independent of :nml:option:`conv_scheme`: it can be used with frozen
+   convection or the local TDC heat-flux closure. It does not enable
+   turbulent pressure or turbulent-energy transport.
+
+   The active viscous problem requires a nonrotating, single-segment
+   envelope with ``variables_set = 'GYRE'``, ``inner_bound = 'ZERO_R'``,
+   ``lambda_method = 'SPH'``, ``time_factor = 'OSC'``,
+   ``alpha_gam = alpha_pi = 1``, and ``alpha_trb = alpha_rht = 0``.
+   Set ``diff_scheme = 'COLLOC_GL2'`` and
+   ``nad_matrix_solver = 'BANDED'`` in ``&num``. A viscous outer
+   surface requires ``outer_bound = 'VACUUM'`` or ``'ZERO_R'``.
+   Atmospheric conditions can be retained when the surface viscosity
+   is zero. Regular central boundaries, segment matching, and
+   inhomogeneous forcing are not supported by this option.
+   See :ref:`osc-conv-visc` for the equations.
+
 .. nml:option:: deps_scheme
    :type: string
    :default: 'MODEL'

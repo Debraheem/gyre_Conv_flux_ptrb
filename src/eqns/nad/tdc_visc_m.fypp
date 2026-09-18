@@ -1,0 +1,494 @@
+! Module  : tdc_visc_m
+! Purpose : Kuhfuss eddy viscosity for nonadiabatic envelope oscillations
+!
+! Copyright 2013-2026 Rich Townsend & The GYRE Team
+!
+! This file is part of GYRE. GYRE is free software: you can
+! redistribute it and/or modify it under the terms of the GNU General
+! Public License as published by the Free Software Foundation, version 3.
+!
+! GYRE is distributed in the hope that it will be useful, but WITHOUT
+! ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+! or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public
+! License for more details.
+!
+! You should have received a copy of the GNU General Public License
+! along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+#:include 'gyre.inc'
+
+module tdc_visc_m
+
+   use forum_m, only: RD
+
+   use bound_conds_m
+   use constants_m
+   use context_m
+   use ext_m
+   use grid_m
+   use gyre_nad_diff_eqns_m
+   use inter_block_m
+   use model_m
+   use model_util_m
+   use num_par_m
+   use osc_par_m
+   use point_m
+   use state_m
+   use tdc_turb_m
+
+   use IEEE_ARITHMETIC, only: IEEE_IS_FINITE
+   use ISO_FORTRAN_ENV
+
+   implicit none (type, external)
+
+   type :: tdc_visc_pt_t
+      private
+      type(gyre_nad_diff_eqns_t) :: de
+      type(tdc_turb_bg_t) :: bg
+      real(RD) :: x, V, V_g, c_1, ups_T, nabla, nabla_ad
+      real(RD) :: c_lum, c_rad, kap_T, kap_rho, Gamma_1
+      real(RD) :: C, K, c_visc, f_conv, alpha_grv
+      integer :: l
+      logical :: perturb_Pturb
+   end type tdc_visc_pt_t
+
+   type, extends(inter_block_ct) :: tdc_visc_block_t
+      private
+      type(tdc_visc_pt_t) :: mid
+      real(RD) :: dx, x_b, dx_h, w_h, c_visc_b, c_1_b, dC
+      logical :: last
+   contains
+      procedure :: eval => eval_block_
+   end type tdc_visc_block_t
+
+   type, extends(bound_conds_ct) :: tdc_visc_bound_t
+      private
+      class(bound_conds_ct), allocatable :: bc
+      type(tdc_visc_pt_t) :: vp
+      real(RD) :: dx_h
+      logical :: inner, free_surface
+   contains
+      procedure :: eval => eval_bound_
+   end type tdc_visc_bound_t
+
+   interface tdc_visc_pt_t
+      module procedure tdc_visc_pt_t_
+   end interface
+   interface tdc_visc_block_t
+      module procedure tdc_visc_block_t_
+   end interface
+   interface tdc_visc_bound_t
+      module procedure tdc_visc_bound_t_
+   end interface
+
+   public :: tdc_visc_pt_t, tdc_visc_block_t, tdc_visc_bound_t
+   public :: tdc_visc_enabled, tdc_visc_coeff, tdc_visc_transform
+   private
+
+contains
+
+   function tdc_visc_coeff(ml, pt, alpha_M) result(c_visc)
+
+      class(model_t), intent(in) :: ml
+      type(point_t), intent(in) :: pt
+      real(RD), intent(in) :: alpha_M
+      real(RD) :: c_visc
+
+      real(RD) :: alpha, A0, Lambda, r, m, c_1, nu
+
+      c_visc = 0._RD
+      if (alpha_M == 0._RD) return
+
+      call check_model(ml, [I_TDC_A0,I_TDC_ALPHA_MLT,I_TDC_HP,I_TDC_R,I_TDC_M,I_C_1])
+      alpha = alpha_M
+      if (alpha == -1._RD) then
+         call check_model(ml, [I_TDC_ALPHA_M])
+         alpha = ml%coeff(I_TDC_ALPHA_M, pt)
+      end if
+      @:ASSERT(IEEE_IS_FINITE(alpha) .AND. alpha >= 0._RD, 'invalid eddy viscosity coefficient')
+      if (alpha == 0._RD) return
+
+      A0 = ml%coeff(I_TDC_A0, pt)
+      @:ASSERT(IEEE_IS_FINITE(A0) .AND. A0 >= 0._RD, 'invalid turbulent velocity')
+      if (A0 == 0._RD) return
+
+      Lambda = ml%coeff(I_TDC_ALPHA_MLT, pt)*ml%coeff(I_TDC_HP, pt)
+      r = ml%coeff(I_TDC_R, pt)
+      m = ml%coeff(I_TDC_M, pt)
+      c_1 = ml%coeff(I_C_1, pt)
+      @:ASSERT(Lambda > 0._RD .AND. r > 0._RD .AND. m > 0._RD .AND. c_1 > 0._RD, 'invalid viscous background')
+      nu = alpha*Lambda*A0
+      c_visc = nu*SQRT(G_GRAVITY*m*c_1/r**3)/(G_GRAVITY*m/r)
+      @:ASSERT(IEEE_IS_FINITE(c_visc), 'invalid dimensionless viscosity')
+
+   end function tdc_visc_coeff
+
+   !****
+
+   function tdc_visc_enabled(cx, gr, os_p, nm_p) result(enabled)
+
+      type(context_t), intent(in) :: cx
+      type(grid_t), intent(in) :: gr
+      type(osc_par_t), intent(in) :: os_p
+      type(num_par_t), intent(in) :: nm_p
+      logical :: enabled
+
+      class(model_t), pointer :: ml
+      integer :: j
+
+      enabled = .FALSE.
+      if (os_p%tdc_alpha_M == 0._RD) return
+      ml => cx%model()
+      do j = 1, gr%n
+         if (tdc_visc_coeff(ml, gr%pt(j), os_p%tdc_alpha_M) > 0._RD) enabled = .TRUE.
+      end do
+      if (.NOT. enabled) return
+
+      @:ASSERT(os_p%variables_set == 'GYRE', 'eddy viscosity requires variables_set = GYRE')
+      @:ASSERT(os_p%lambda_method == 'SPH', 'eddy viscosity requires lambda_method = SPH')
+      @:ASSERT(os_p%inner_bound == 'ZERO_R' .AND. gr%pt(1)%x > 0._RD, 'eddy viscosity requires a ZERO_R envelope')
+      @:ASSERT(nm_p%diff_scheme == 'COLLOC_GL2', 'eddy viscosity requires diff_scheme = COLLOC_GL2')
+      @:ASSERT(nm_p%nad_matrix_solver == 'BANDED', 'eddy viscosity requires nad_matrix_solver = BANDED')
+      @:ASSERT(os_p%alpha_trb == 0._RD .AND. os_p%alpha_rht == 0._RD, 'eddy viscosity requires alpha_trb = alpha_rht = 0')
+      @:ASSERT(os_p%alpha_gam == 1._RD .AND. os_p%alpha_pi == 1._RD, 'eddy viscosity requires alpha_gam = alpha_pi = 1')
+      @:ASSERT(os_p%time_factor == 'OSC', 'eddy viscosity requires time_factor = OSC')
+      do j = 1, gr%n
+         @:ASSERT(cx%Omega_rot(gr%pt(j)) == 0._RD, 'eddy viscosity does not support rotation')
+         @:ASSERT(gr%pt(j)%s == gr%pt(1)%s, 'eddy viscosity does not support segment matching')
+      end do
+      if (tdc_visc_coeff(ml, gr%pt(gr%n), os_p%tdc_alpha_M) > 0._RD) then
+         @:ASSERT(os_p%outer_bound == 'VACUUM' .OR. os_p%outer_bound == 'ZERO_R', 'viscous surface requires VACUUM or ZERO_R')
+      end if
+
+   end function tdc_visc_enabled
+
+   !****
+
+   function tdc_visc_pt_t_(cx, pt, os_p) result(vp)
+
+      type(context_t), pointer, intent(in) :: cx
+      type(point_t), intent(in) :: pt
+      type(osc_par_t), intent(in) :: os_p
+      type(tdc_visc_pt_t) :: vp
+
+      class(model_t), pointer :: ml
+
+      ml => cx%model()
+      vp%de = gyre_nad_diff_eqns_t(cx, pt, os_p)
+      vp%x = pt%x
+      vp%l = cx%l
+      vp%V = ml%coeff(I_V_2, pt)*pt%x**2
+      vp%Gamma_1 = ml%coeff(I_GAMMA_1, pt)
+      vp%V_g = vp%V/vp%Gamma_1
+      vp%c_1 = ml%coeff(I_C_1, pt)
+      vp%ups_T = ml%coeff(I_UPS_T, pt)
+      vp%nabla = ml%coeff(I_NABLA, pt)
+      vp%nabla_ad = ml%coeff(I_NABLA_AD, pt)
+      vp%c_lum = ml%coeff(I_C_LUM, pt)
+      vp%c_rad = ml%coeff(I_C_RAD, pt)
+      vp%kap_T = os_p%alpha_kat*ml%coeff(I_KAP_T, pt)
+      vp%kap_rho = os_p%alpha_kar*ml%coeff(I_KAP_RHO, pt)
+      vp%C = vp%V*vp%nabla_ad
+      vp%K = ml%coeff(I_U, pt) + vp%l - ml%coeff(I_AS, pt) - vp%V_g
+      vp%c_visc = tdc_visc_coeff(ml, pt, os_p%tdc_alpha_M)
+      vp%alpha_grv = os_p%alpha_grv
+      vp%perturb_Pturb = os_p%conv_scheme == 'PERTURBED_TDC_LOCAL' .AND. os_p%tdc_perturb_mlt_Pturb
+      if (vp%perturb_Pturb) call eval_tdc_turb_bg(ml, pt, os_p%tdc_yenv_scheme, vp%bg)
+      select case (os_p%conv_scheme)
+      case ('FROZEN_PESNELL_1')
+         vp%f_conv = vp%c_rad*(3._RD + ml%dcoeff(I_C_RAD, pt))
+      case ('FROZEN_PESNELL_4')
+         vp%f_conv = vp%c_lum*(3._RD + ml%dcoeff(I_C_LUM, pt)) - (vp%c_lum - vp%c_rad)
+      case ('PERTURBED_TDC_LOCAL')
+         vp%f_conv = vp%c_lum*(3._RD + ml%dcoeff(I_C_LUM, pt))
+      end select
+
+   end function tdc_visc_pt_t_
+
+   !****
+
+   subroutine mapping_(vp, st, Q, normal)
+
+      type(tdc_visc_pt_t), intent(in) :: vp
+      class(state_ct), intent(in) :: st
+      complex(RD), intent(out) :: Q(6,8), normal(8)
+
+      complex(RD) :: F, N(6), eos(6), row(6), denom
+      integer :: i
+
+      F = (0._RD,1._RD)*st%omega*vp%c_visc
+      eos = 0._RD
+      if (vp%perturb_Pturb .AND. vp%c_visc /= 0._RD) then
+         call eval_tdc_turb_row_gyre(vp%bg, vp%x, vp%l, vp%V, vp%c_1, vp%Gamma_1, &
+            vp%ups_T, vp%nabla_ad, vp%nabla, vp%c_lum, vp%c_rad, vp%kap_T, vp%kap_rho, &
+            (0._RD,1._RD)*st%omega, CMPLX(1._RD,KIND=RD), .TRUE., row, eos)
+      end if
+      eos(2) = eos(2) + 1._RD
+      N = (4._RD/3._RD)*F*vp%V_g*eos
+      N(1) = N(1) - (4._RD/3._RD)*F*(vp%V_g - 3._RD)
+      N(5) = N(5) - (4._RD/3._RD)*F*vp%ups_T
+
+      ! z_2 = y_2 - n; z_5 = y_5 + C*n.
+
+      Q = 0._RD
+      do i = 1, 6
+         Q(i,i) = 1._RD
+      end do
+      normal = MATMUL(N,Q)
+      normal(7) = -2._RD*F*vp%l*(vp%l+1)
+      denom = 1._RD - N(2) + vp%C*N(5)
+      @:ASSERT(ABS(denom) > TINY(1._RD), 'singular normal viscous traction relation')
+      normal = normal/denom
+      Q(2,:) = Q(2,:) + normal
+      Q(5,:) = Q(5,:) - vp%C*normal
+
+   end subroutine mapping_
+
+   !****
+
+   subroutine equations_(vp, st, dC, A)
+
+      type(tdc_visc_pt_t), intent(in) :: vp
+      class(state_ct), intent(in) :: st
+      real(RD), intent(in) :: dC
+      complex(RD), intent(out) :: A(7,8)
+
+      complex(RD) :: B(6,6), Q(6,8), normal(8), H(6), F, om2
+      real(RD) :: L
+
+      call vp%de%eval(st, vp%x, B)
+      call mapping_(vp, st, Q, normal)
+      L = REAL(vp%l*(vp%l+1),RD)
+      om2 = vp%c_1*st%omega**2
+      F = (0._RD,1._RD)*st%omega*vp%c_visc
+
+      ! Restore horizontal displacement before applying viscous momentum.
+
+      H = 0._RD
+      H(1) = L
+      H(5) = L*vp%V*(vp%nabla_ad - vp%nabla)
+      H(6) = L*vp%f_conv
+      B(:,2) = B(:,2) - H/om2
+      B(:,3) = B(:,3) - vp%alpha_grv*H/om2
+      A(1:6,:) = MATMUL(B,Q)
+      A(1:6,7) = A(1:6,7) + H
+      A(5,:) = A(5,:) + (dC-vp%C*vp%K)*normal
+      A(5,8) = A(5,8) + vp%C*L
+      A(2,:) = A(2,:) + vp%K*normal
+      A(2,8) = A(2,8) - L
+      A(7,:) = Q(2,:) + vp%alpha_grv*Q(3,:) + 0.5_RD*normal
+      A(7,7) = A(7,7) - om2 + F*(2._RD-L)
+      A(7,8) = A(7,8) - vp%K
+
+   end subroutine equations_
+
+   !****
+
+   function tdc_visc_block_t_(cx, gr, j, os_p) result(db)
+
+      type(context_t), pointer, intent(in) :: cx
+      type(grid_t), intent(in) :: gr
+      integer, intent(in) :: j
+      type(osc_par_t), intent(in) :: os_p
+      type(tdc_visc_block_t) :: db
+
+      type(point_t) :: pt
+      class(model_t), pointer :: ml
+      real(RD) :: C_a, C_b
+
+      ml => cx%model()
+      pt = gr%pt(j)
+      db%dx = gr%pt(j+1)%x - pt%x
+      pt%x = pt%x + 0.5_RD*db%dx
+      db%mid = tdc_visc_pt_t(cx, pt, os_p)
+      db%x_b = gr%pt(j+1)%x
+      db%c_visc_b = tdc_visc_coeff(ml, gr%pt(j+1), os_p%tdc_alpha_M)
+      db%c_1_b = ml%coeff(I_C_1, gr%pt(j+1))
+      C_a = ml%coeff(I_V_2, gr%pt(j))*gr%pt(j)%x**2*ml%coeff(I_NABLA_AD, gr%pt(j))
+      C_b = ml%coeff(I_V_2, gr%pt(j+1))*gr%pt(j+1)%x**2*ml%coeff(I_NABLA_AD, gr%pt(j+1))
+      db%dC = pt%x*(C_b-C_a)/db%dx
+      db%last = j == gr%n-1
+      db%n_e = MERGE(6,8,cx%l == 0)
+      if (db%last) then
+         db%dx_h = 0.5_RD*db%dx
+         db%w_h = 0._RD
+      else
+         db%dx_h = 0.5_RD*(gr%pt(j+2)%x - gr%pt(j)%x)
+         db%w_h = (db%dx_h - 0.5_RD*db%dx)/db%dx_h
+      end if
+
+   end function tdc_visc_block_t_
+
+   !****
+
+   subroutine eval_block_(this, st, E, scl, F, trans)
+
+      class(tdc_visc_block_t), intent(in) :: this
+      class(state_ct), intent(in) :: st
+      complex(RD), contiguous, intent(out) :: E(:,:)
+      type(ext_ct), intent(out) :: scl
+      complex(RD), contiguous, intent(out), optional :: F(:)
+      logical, intent(in), optional :: trans
+
+      complex(RD) :: A(7,8), W(this%n_e,2*this%n_e), Fb
+      real(RD) :: d, scale
+      integer :: i, n
+
+      call equations_(this%mid, st, this%dC, A)
+      n = this%n_e
+      d = this%dx/this%mid%x
+      W = 0._RD
+      W(1:6,1:6) = 0.5_RD*d*A(1:6,1:6)
+      W(1:6,n+1:n+6) = W(1:6,1:6)
+      do i = 1, 6
+         W(i,i) = W(i,i) + 1._RD
+         W(i,n+i) = W(i,n+i) - 1._RD
+      end do
+      if (n == 8) then
+         W(1:6,7) = d*A(1:6,7)
+         W(1:6,8) = 0.5_RD*d*A(1:6,8)
+         W(1:6,16) = W(1:6,8)
+         W(7,1:6) = 0.5_RD*d*A(7,1:6)
+         W(7,9:14) = W(7,1:6)
+         W(7,7) = d*A(7,7)
+         W(7,8) = 1._RD + 0.5_RD*d*A(7,8)
+         W(7,16) = -1._RD + 0.5_RD*d*A(7,8)
+
+         ! Give the inviscid algebraic relation a frequency-independent h pivot.
+
+         if (this%mid%c_visc == 0._RD) &
+            W(7,:) = W(7,:)/(d*this%mid%c_1*st%omega**2)
+
+         ! Keep the constitutive relation implicit when viscosity vanishes.
+
+         Fb = (0._RD,1._RD)*st%omega*this%c_visc_b
+         if (this%last) then
+            if (this%c_visc_b > 0._RD) then
+               W(8,7) = -this%x_b/this%dx_h
+               W(8,15) = this%x_b/this%dx_h + this%mid%l-2
+               W(8,9) = 1._RD
+            else
+               ! At an inviscid surface y_2 = z_2.
+               W(8,10) = 1._RD/(this%c_1_b*st%omega**2)
+               W(8,11) = this%mid%alpha_grv*W(8,10)
+               W(8,15) = -1._RD
+            end if
+         else
+            W(8,7) = Fb*(-this%x_b/this%dx_h + (this%mid%l-2)*this%w_h)
+            W(8,15) = Fb*(this%x_b/this%dx_h + (this%mid%l-2)*(1._RD-this%w_h))
+            W(8,9) = Fb
+            W(8,16) = 1._RD
+         end if
+         scale = MAX(1._RD, this%c_visc_b*(this%x_b/this%dx_h+ABS(this%mid%l-2)+1._RD))
+         if (this%last .AND. this%c_visc_b > 0._RD) scale = MAX(1._RD, this%x_b/this%dx_h)
+         W(8,:) = W(8,:)/scale
+      end if
+      if (PRESENT(trans)) then
+         if (trans) then
+            E = TRANSPOSE(W)
+         else
+            E = W
+         end if
+      else
+         E = W
+      end if
+      scl = ONE_CT
+      if (PRESENT(F)) then
+         @:ABORT('eddy viscosity does not support inhomogeneous forcing')
+      end if
+
+   end subroutine eval_block_
+
+   !****
+
+   function tdc_visc_bound_t_(bc, vp, inner, dx_h, outer_bound) result(vb)
+
+      class(bound_conds_ct), intent(in) :: bc
+      type(tdc_visc_pt_t), intent(in) :: vp
+      logical, intent(in) :: inner
+      real(RD), intent(in) :: dx_h
+      character(*), intent(in) :: outer_bound
+      type(tdc_visc_bound_t) :: vb
+
+      vb%bc = bc
+      vb%vp = vp
+      vb%inner = inner
+      vb%dx_h = dx_h
+      vb%free_surface = .NOT. inner .AND. outer_bound == 'VACUUM'
+      vb%n_e = MERGE(6,8,vp%l == 0)
+      vb%n_b = MERGE(3,4,vp%l == 0)
+
+   end function tdc_visc_bound_t_
+
+   !****
+
+   subroutine eval_bound_(this, st, B, s, trans)
+
+      class(tdc_visc_bound_t), intent(in) :: this
+      class(state_ct), intent(in) :: st
+      complex(RD), contiguous, intent(out) :: B(:,:)
+      complex(RD), contiguous, intent(out), optional :: s(:)
+      logical, intent(in), optional :: trans
+
+      complex(RD) :: B0(3,6), Q(6,8), normal(8), W(this%n_b,this%n_e), h(8)
+
+      call this%bc%eval(st, B0)
+      call mapping_(this%vp, st, Q, normal)
+      if (this%inner .AND. this%n_e == 8) then
+         ! Extrapolate the cell displacement to the stress-free inner face.
+         h = 0._RD
+         h(7) = 1._RD
+         h(1) = this%dx_h/this%vp%x
+         h = h/(1._RD - (this%vp%l-2)*this%dx_h/this%vp%x)
+         Q(:,1) = Q(:,1) + Q(:,7)*h(1)
+         Q(:,7) = Q(:,7)*h(7)
+      end if
+      W(1:3,:) = MATMUL(B0,Q(:,1:this%n_e))
+      if (this%free_surface) then
+         W(1,:) = 0._RD
+         W(1,1) = 1._RD
+         W(1,2) = -1._RD
+      end if
+      if (this%n_e == 8) then
+         W(4,:) = 0._RD
+         W(4,8) = 1._RD
+      end if
+      if (PRESENT(trans)) then
+         if (trans) then
+            B = TRANSPOSE(W)
+         else
+            B = W
+         end if
+      else
+         B = W
+      end if
+      if (PRESENT(s)) then
+         @:ABORT('eddy viscosity does not support inhomogeneous forcing')
+      end if
+
+   end subroutine eval_bound_
+
+   !****
+
+   subroutine tdc_visc_transform(vp, st, z, h, y, xi_h)
+
+      type(tdc_visc_pt_t), intent(in) :: vp
+      class(state_ct), intent(in) :: st
+      complex(RD), intent(in) :: z(:), h
+      complex(RD), intent(out) :: y(6), xi_h
+
+      complex(RD) :: Q(6,8), normal(8), v(8)
+
+      call mapping_(vp, st, Q, normal)
+      v = 0._RD
+      v(1:6) = z(1:6)
+      v(7) = h
+      y = MATMUL(Q,v)
+      xi_h = h*vp%x**(vp%l-1)
+      if (vp%l == 0) xi_h = 0._RD
+      if (vp%c_visc == 0._RD .AND. vp%l /= 0) &
+         xi_h = (y(2)+vp%alpha_grv*y(3))/(vp%c_1*st%omega**2)*vp%x**(vp%l-1)
+
+   end subroutine tdc_visc_transform
+
+end module tdc_visc_m
