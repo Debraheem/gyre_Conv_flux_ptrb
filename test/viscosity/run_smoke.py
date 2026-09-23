@@ -40,7 +40,7 @@ def inlist(profile, ell, alpha, n_iter=60, conv="FROZEN_PESNELL_4", x_i=0.1):
   outer_bound = 'JCD'
   conv_scheme = '{conv}'
   alpha_hfc = {1 if conv == 'PERTURBED_TDC_LOCAL' else 0}
-  tdc_perturb_mlt_Pturb = .true.
+  tdc_include_Pturb = .true.
 {control}/
 &num
   diff_scheme = 'COLLOC_GL2'

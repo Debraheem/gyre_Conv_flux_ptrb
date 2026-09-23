@@ -437,6 +437,81 @@ Energetics & Transport
 
    Mode work :math:`W \equiv \int \sderiv{W}{x} \, \diff{x}`\ [#only-N]_
 
+.. ofile:field:: P_visc
+   :type: real
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Negative phase-averaged viscous volume dissipation, with
+   :math:`t_{\rm dyn}=(\Rstar^3/G\Mstar)^{1/2}`. Excludes boundary
+   power and scales with squared mode amplitude.
+
+.. ofile:field:: P_visc_cum
+   :type: real
+   :dim: :ofile:field:`n`
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Cumulative viscous volume dissipation from the inner boundary.
+   Its outermost value equals :ofile:field:`P_visc`.
+
+.. ofile:field:: dP_visc_dx
+   :type: real
+   :dim: :ofile:field:`n`
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Average viscous power density over the interval ending at this
+   grid point. Zero at the first point and at the second point of a
+   double point. Its sum weighted by interval width equals
+   :ofile:field:`P_visc`. All viscous outputs vanish when
+   viscosity is disabled.
+
+.. ofile:field:: P_visc_force
+   :type: real
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Phase-averaged viscous force work
+   :math:`\frac12\Re\int\rho\,\mathbf v^*\cdot\mathbf a_\nu\,\diff V`,
+   evaluated from the native stresses.
+
+.. ofile:field:: P_visc_bound
+   :type: real
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Phase-averaged viscous work through the inner and outer face of
+   each segment, including both sides of internal interfaces.
+
+.. ofile:field:: P_visc_residual
+   :type: real
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Signed balance residual ``P_visc_force - P_visc_bound - P_visc``.
+   This is a spatial-discretization diagnostic, not a growth rate.
+   All powers use the same squared mode-amplitude normalization.
+
+.. ofile:field:: P_visc_force_cum
+   :type: real
+   :dim: :ofile:field:`n`
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Cumulative viscous force work from the inner boundary.
+   Its outermost value equals :ofile:field:`P_visc_force`.
+
+.. ofile:field:: P_visc_bound_cum
+   :type: real
+   :dim: :ofile:field:`n`
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Cumulative boundary contribution, with each segment referenced to
+   its own inner face. Its outermost value equals
+   :ofile:field:`P_visc_bound`.
+
+.. ofile:field:: P_visc_residual_cum
+   :type: real
+   :dim: :ofile:field:`n`
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Cumulative signed viscous work-balance residual.
+   Its outermost value equals :ofile:field:`P_visc_residual`.
+
 .. ofile:field:: W_eps
    :type: real
    :units: :math:`G\Mstar^{2}/\Rstar`

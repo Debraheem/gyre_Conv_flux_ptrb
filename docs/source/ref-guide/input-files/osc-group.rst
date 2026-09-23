@@ -222,7 +222,7 @@ available:
      replaces the radiative thermal-gradient closure. Set
      :nml:option:`alpha_hfc <osc.alpha_hfc>` to 1 to include the horizontal
      convective heat-flux term for nonradial modes. Set
-     :nml:option:`tdc_perturb_mlt_Pturb <osc.tdc_perturb_mlt_Pturb>` to
+     :nml:option:`tdc_include_Pturb <osc.tdc_include_Pturb>` to
      :nml:value:`.TRUE.` to include the local MLT turbulent-pressure
      perturbation. This scheme requires :nml:option:`variables_set
      <osc.variables_set>` = :nml:value:`'GYRE'` and does not support
@@ -239,14 +239,15 @@ available:
      exported background convective luminosity.
    - :nml:value:`'NONE'` : Use :math:`Y_{\rm env}=Y`.
 
-.. nml:option:: tdc_perturb_mlt_Pturb
+.. nml:option:: tdc_include_Pturb
    :type: logical
    :default: .FALSE.
 
-   Include the local MLT turbulent-pressure perturbation in the
-   :nml:value:`'PERTURBED_TDC_LOCAL'` convection branch. The turbulent-pressure
-   amplitude is read from the version-1.30 ``tdc_mlt_Pturb0`` model
-   coefficient. When this option is :nml:value:`.TRUE.` and
+   Include the local perturbation of MESA MLT turbulent pressure in the
+   :nml:value:`'PERTURBED_TDC_LOCAL'` convection branch. The equilibrium
+   pressure is read from the version-1.30 ``tdc_mlt_Pturb0`` model
+   coefficient, whose normalization is set by MESA's ``mlt_Pturb_factor``.
+   When this option is :nml:value:`.TRUE.` and
    ``tdc_mlt_Pturb0`` is nonzero at a mesh point, the local TDC closure uses a
    three-by-three solve for the EOS-pressure perturbation,
    :math:`\delta\nabla`, and :math:`\delta A`. Otherwise it uses the default
@@ -274,16 +275,26 @@ available:
    convection or the local TDC heat-flux closure. It does not enable
    turbulent pressure or turbulent-energy transport.
 
-   The active viscous problem requires a nonrotating, single-segment
-   envelope with ``variables_set = 'GYRE'``, ``inner_bound = 'ZERO_R'``,
-   ``lambda_method = 'SPH'``, ``time_factor = 'OSC'``,
-   ``alpha_gam = alpha_pi = 1``, and ``alpha_trb = alpha_rht = 0``.
-   Set ``diff_scheme = 'COLLOC_GL2'`` and
-   ``nad_matrix_solver = 'BANDED'`` in ``&num``. A viscous outer
+   The active viscous problem requires a nonrotating model with
+   ``variables_set = 'GYRE'``, ``lambda_method = 'SPH'``,
+   ``alpha_gam = alpha_pi = 1``, and ``alpha_trb = 0``.
+   Set ``diff_scheme = 'COLLOC_GL2'`` or ``'MAGNUS_GL2'`` in ``&num``; ``BANDED``,
+   ``ROWPP``, and ``CYCLIC`` matrix solvers are supported.
+   For nonradial modes, Magnus propagation retains the implicit staggered
+   shear relation and midpoint horizontal reconstruction. Both methods
+   are second order. Higher order discretizations are not implemented
+   for active viscosity.
+   Both time conventions and nonzero ``alpha_rht`` are allowed.
+   Use ``ZERO_R`` at a finite inner radius, or ``REGULAR`` at a center.
+   A positive-viscosity first interval uses regular scalar and vector
+   expansions with midpoint collocation. It requires a regular equilibrium
+   and a resolved central interval. The central viscosity must be finite
+   and positive, or the first interval must be inviscid. A coefficient
+   vanishing only at the origin is not supported. A viscous outer
    surface requires ``outer_bound = 'VACUUM'`` or ``'ZERO_R'``.
    Atmospheric conditions can be retained when the surface viscosity
-   is zero. Regular central boundaries, segment matching, and
-   inhomogeneous forcing are not supported by this option.
+   is zero. Multiple grid segments are supported, with traction matching
+   at their interfaces. Inhomogeneous forcing is not supported by this option.
    See :ref:`osc-conv-visc` for the equations.
 
 .. nml:option:: deps_scheme

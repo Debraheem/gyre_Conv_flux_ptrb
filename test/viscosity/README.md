@@ -11,15 +11,36 @@ make check PROFILE=/path/to/gyre.data PYTHON=python3
 ```
 
 The makefile uses the same default SDK libraries as the GYRE build.
+Set `GYRE_DIR` explicitly if the environment points to a different build.
 Set `FFLAGS` and `LDLIBS` when testing a build with different libraries.
 The tensor test requires SymPy. The mode tests require NumPy and h5py.
+
+`test_support` compares the determinant for BANDED, ROWPP, and CYCLIC,
+with OSC and EXP time conventions, for degrees 0 through 3 and both
+frozen convection and TDC. Both COLLOC_GL2 and MAGNUS_GL2 are checked.
+Manufactured displacement fields check
+nonpositive volume dissipation, quadratic amplitude scaling, and zero
+loss for rigid translation. These are not discrete energy-balance tests.
+
+For a profile with a radiative core, `make check_regular PROFILE=...`
+tests the regular central boundary with `alpha_rht=1`. Positive central
+viscosity has a separate regular expansion, implemented in `tdc_visc_m`.
+This radiative-core test does not exercise it; positive central viscosity
+still requires numerical convergence tests.
 
 The native test also checks frequency-independent horizontal pivots
 in inviscid intervals and at an inviscid surface. Eliminating the
 algebraic horizontal displacement must recover the ordinary six-variable
-midpoint equations for degrees 1 through 3 at complex frequencies.
+midpoint or Magnus equations for degrees 1 through 3 at complex frequencies.
+The Magnus check also approaches zero viscosity at a convective point
+using `tdc_alpha_M=1d-12`, without a coefficient floor.
 The supplied profile must contain an inviscid interval and a viscous
 test point.
+
+For nonradial Magnus, the differential rows use exponential propagation;
+the horizontal reconstruction and implicit shear relation remain second
+order. Invoking MAGNUS_GL2 does not enable a nodal eight-variable
+propagator or a higher order shear discretization.
 
 ```sh
 python3 run_smoke.py --binary ../../bin/gyre \

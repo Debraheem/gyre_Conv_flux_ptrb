@@ -358,6 +358,10 @@ contains
             ('E_ratio', 'wv%E_ratio()'), &
             ('H', 'wv%H()'), &
             ('W', 'wv%W()'), &
+            ('P_visc', 'wv%P_visc()'), &
+            ('P_visc_force', 'wv%P_visc_force()'), &
+            ('P_visc_bound', 'wv%P_visc_bound()'), &
+            ('P_visc_residual', 'wv%P_visc_residual()'), &
             ('W_eps', 'wv%W_eps()'), &
             ('Q', 'wv%Q()'), &
             ('tau_ss', 'wv%tau_ss()'), &

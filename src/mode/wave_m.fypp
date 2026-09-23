@@ -65,6 +65,8 @@ module wave_m
       logical                  :: is_vacuum
       complex(RD), allocatable :: y_c(:,:)
       complex(RD), allocatable :: xi_h_c(:)
+      real(RD), allocatable    :: visc_power(:)
+      real(RD), allocatable    :: visc_force(:), visc_bound(:)
       complex(RD), public      :: scl
       complex(RD), public      :: omega
       complex(RD), public      :: l_i
@@ -104,6 +106,11 @@ module wave_m
       procedure, public :: lambda
       procedure, public :: dE_dx
       procedure, public :: dW_dx
+      procedure, public :: dP_visc_dx
+      procedure, public :: P_visc
+      procedure, public :: P_visc_force
+      procedure, public :: P_visc_bound
+      procedure, public :: P_visc_residual
       procedure, public :: dW_eps_dx
       procedure, public :: dQ_dx
       procedure, public :: dzeta_dx
@@ -161,7 +168,8 @@ module wave_m
 
 contains
 
-   function wave_t_(st, y_c, cx, gr, md_p, nm_p, os_p, id, chi, n_iter, xi_h_c) result(wv)
+   function wave_t_(st, y_c, cx, gr, md_p, nm_p, os_p, id, chi, n_iter, xi_h_c, &
+         visc_power, visc_force, visc_bound) result(wv)
 
       type(state_ct), intent(in)    :: st
       complex(RD), intent(in)       :: y_c(:,:)
@@ -174,6 +182,8 @@ contains
       real(RD), intent(in)          :: chi
       integer, intent(in)           :: n_iter
       complex(RD), intent(in), optional :: xi_h_c(:)
+      real(RD), intent(in), optional :: visc_power(:)
+      real(RD), intent(in), optional :: visc_force(:), visc_bound(:)
       type(wave_t)                  :: wv
 
       real(RD) :: x_ref
@@ -195,6 +205,18 @@ contains
       if (PRESENT(xi_h_c)) then
          @:CHECK_BOUNDS(SIZE(xi_h_c), gr%n)
          wv%xi_h_c = xi_h_c
+      end if
+      if (PRESENT(visc_power)) then
+         @:CHECK_BOUNDS(SIZE(visc_power), gr%n)
+         wv%visc_power = visc_power
+      end if
+      if (PRESENT(visc_force)) then
+         @:CHECK_BOUNDS(SIZE(visc_force), gr%n)
+         wv%visc_force = visc_force
+      end if
+      if (PRESENT(visc_bound)) then
+         @:CHECK_BOUNDS(SIZE(visc_bound), gr%n)
+         wv%visc_bound = visc_bound
       end if
 
       wv%omega = st%omega
@@ -1148,6 +1170,58 @@ contains
       return
 
    end function dW_dx
+
+   !****
+
+   #:for name, field in [('P_visc', 'visc_power'), ('P_visc_force', 'visc_force'), ('P_visc_bound', 'visc_bound')]
+   function ${name}$(this, j) result(power)
+
+      class(wave_t), intent(in) :: this
+      integer, intent(in), optional :: j
+      real(RD) :: power
+      integer :: k
+
+      ! Cumulative phase-averaged power in G*M_star**2/(R_star*t_dyn).
+
+      power = 0._RD
+      if (.NOT. ALLOCATED(this%${field}$)) return
+      k = this%n
+      if (PRESENT(j)) k = j
+      power = this%${field}$(k)*ABS(this%scl)**2
+
+   end function ${name}$
+
+   !****
+   #:endfor
+
+   function P_visc_residual(this, j) result(power)
+
+      class(wave_t), intent(in) :: this
+      integer, intent(in), optional :: j
+      real(RD) :: power
+
+      power = this%P_visc_force(j)-this%P_visc_bound(j)-this%P_visc(j)
+
+   end function P_visc_residual
+
+   !****
+
+   function dP_visc_dx(this, j) result(power)
+
+      class(wave_t), intent(in) :: this
+      integer, intent(in) :: j
+      real(RD) :: power
+      real(RD) :: dx
+
+      ! Average over the interval ending at grid point j.
+
+      power = 0._RD
+      if (j == 1) return
+      dx = this%gr%pt(j)%x-this%gr%pt(j-1)%x
+      if (dx == 0._RD) return
+      power = (this%P_visc(j)-this%P_visc(j-1))/dx
+
+   end function dP_visc_dx
 
    !****
 

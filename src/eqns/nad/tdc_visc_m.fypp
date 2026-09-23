@@ -1,5 +1,5 @@
 ! Module  : tdc_visc_m
-! Purpose : Kuhfuss eddy viscosity for nonadiabatic envelope oscillations
+! Purpose : Kuhfuss eddy viscosity for nonadiabatic oscillations
 !
 ! Copyright 2013-2026 Rich Townsend & The GYRE Team
 !
@@ -24,10 +24,13 @@ module tdc_visc_m
    use bound_conds_m
    use constants_m
    use context_m
+   use diff_eqns_m
+   use evol_model_m
    use ext_m
    use grid_m
    use gyre_nad_diff_eqns_m
    use inter_block_m
+   use magnus_gl2_block_m
    use model_m
    use model_util_m
    use num_par_m
@@ -38,6 +41,7 @@ module tdc_visc_m
 
    use IEEE_ARITHMETIC, only: IEEE_IS_FINITE
    use ISO_FORTRAN_ENV
+   use F95_LAPACK, only: LA_GESV
 
    implicit none (type, external)
 
@@ -47,26 +51,45 @@ module tdc_visc_m
       type(tdc_turb_bg_t) :: bg
       real(RD) :: x, V, V_g, c_1, ups_T, nabla, nabla_ad
       real(RD) :: c_lum, c_rad, kap_T, kap_rho, Gamma_1
-      real(RD) :: C, K, c_visc, f_conv, alpha_grv
+      real(RD) :: C, K, c_visc, dc_visc, f_conv, alpha_grv, alpha_omg, rht
       integer :: l
       logical :: perturb_Pturb
    end type tdc_visc_pt_t
 
+   type, extends(diff_eqns_ct) :: tdc_visc_diff_eqns_t
+      private
+      type(tdc_visc_pt_t) :: vp
+      real(RD) :: dx, C_a, C_b, rht_a, rht_b
+   contains
+      procedure :: eval => eval_diff_eqns_
+   end type tdc_visc_diff_eqns_t
+
    type, extends(inter_block_ct) :: tdc_visc_block_t
       private
       type(tdc_visc_pt_t) :: mid
-      real(RD) :: dx, x_b, dx_h, w_h, c_visc_b, c_1_b, dC
-      logical :: last
+      type(tdc_visc_pt_t), allocatable :: right
+      type(magnus_gl2_block_ct), allocatable :: magnus
+      real(RD) :: dx, x_b, dx_h, w_h, c_visc_b, c_1_b, C_a, C_b, rht_a, rht_b
+      logical :: last, surface
+      logical, public :: central
    contains
       procedure :: eval => eval_block_
    end type tdc_visc_block_t
+
+   type, extends(inter_block_ct) :: tdc_visc_match_t
+      private
+      type(tdc_visc_pt_t) :: vp(2)
+      real(RD) :: U(2), dx_h
+   contains
+      procedure :: eval => eval_match_
+   end type tdc_visc_match_t
 
    type, extends(bound_conds_ct) :: tdc_visc_bound_t
       private
       class(bound_conds_ct), allocatable :: bc
       type(tdc_visc_pt_t) :: vp
       real(RD) :: dx_h
-      logical :: inner, free_surface
+      logical :: inner, free_surface, central
    contains
       procedure :: eval => eval_bound_
    end type tdc_visc_bound_t
@@ -80,9 +103,14 @@ module tdc_visc_m
    interface tdc_visc_bound_t
       module procedure tdc_visc_bound_t_
    end interface
+   interface tdc_visc_match_t
+      module procedure tdc_visc_match_t_
+   end interface
 
    public :: tdc_visc_pt_t, tdc_visc_block_t, tdc_visc_bound_t
    public :: tdc_visc_enabled, tdc_visc_coeff, tdc_visc_transform
+   public :: tdc_visc_match_t, tdc_visc_h, tdc_visc_work
+   public :: tdc_visc_center_y
    private
 
 contains
@@ -116,6 +144,11 @@ contains
       r = ml%coeff(I_TDC_R, pt)
       m = ml%coeff(I_TDC_M, pt)
       c_1 = ml%coeff(I_C_1, pt)
+      select type (ml)
+      type is (evol_model_t)
+         r = ml%R_star*pt%x
+         m = ml%M_r(pt)
+      end select
       @:ASSERT(Lambda > 0._RD .AND. r > 0._RD .AND. m > 0._RD .AND. c_1 > 0._RD, 'invalid viscous background')
       nu = alpha*Lambda*A0
       c_visc = nu*SQRT(G_GRAVITY*m*c_1/r**3)/(G_GRAVITY*m/r)
@@ -134,27 +167,38 @@ contains
       logical :: enabled
 
       class(model_t), pointer :: ml
+      type(point_t) :: pt
       integer :: j
 
       enabled = .FALSE.
       if (os_p%tdc_alpha_M == 0._RD) return
       ml => cx%model()
       do j = 1, gr%n
+         if (gr%pt(j)%x == 0._RD) cycle
          if (tdc_visc_coeff(ml, gr%pt(j), os_p%tdc_alpha_M) > 0._RD) enabled = .TRUE.
       end do
+      if (gr%pt(1)%x == 0._RD) then
+         pt = gr%pt(1)
+         pt%x = 0.5_RD*gr%pt(2)%x
+         if (tdc_visc_coeff(ml, pt, os_p%tdc_alpha_M) > 0._RD) enabled = .TRUE.
+      end if
       if (.NOT. enabled) return
 
       @:ASSERT(os_p%variables_set == 'GYRE', 'eddy viscosity requires variables_set = GYRE')
       @:ASSERT(os_p%lambda_method == 'SPH', 'eddy viscosity requires lambda_method = SPH')
-      @:ASSERT(os_p%inner_bound == 'ZERO_R' .AND. gr%pt(1)%x > 0._RD, 'eddy viscosity requires a ZERO_R envelope')
-      @:ASSERT(nm_p%diff_scheme == 'COLLOC_GL2', 'eddy viscosity requires diff_scheme = COLLOC_GL2')
-      @:ASSERT(nm_p%nad_matrix_solver == 'BANDED', 'eddy viscosity requires nad_matrix_solver = BANDED')
-      @:ASSERT(os_p%alpha_trb == 0._RD .AND. os_p%alpha_rht == 0._RD, 'eddy viscosity requires alpha_trb = alpha_rht = 0')
+      select case (os_p%inner_bound)
+      case ('REGULAR')
+         @:ASSERT(gr%pt(1)%x == 0._RD, 'REGULAR requires a central grid point')
+      case ('ZERO_R')
+         @:ASSERT(gr%pt(1)%x > 0._RD, 'ZERO_R requires a finite inner radius')
+      case default
+         @:ABORT('eddy viscosity requires REGULAR or ZERO_R')
+      end select
+      @:ASSERT(ANY(nm_p%diff_scheme == ['COLLOC_GL2','MAGNUS_GL2']), 'eddy viscosity requires COLLOC_GL2 or MAGNUS_GL2')
+      @:ASSERT(os_p%alpha_trb == 0._RD, 'eddy viscosity requires alpha_trb = 0')
       @:ASSERT(os_p%alpha_gam == 1._RD .AND. os_p%alpha_pi == 1._RD, 'eddy viscosity requires alpha_gam = alpha_pi = 1')
-      @:ASSERT(os_p%time_factor == 'OSC', 'eddy viscosity requires time_factor = OSC')
       do j = 1, gr%n
          @:ASSERT(cx%Omega_rot(gr%pt(j)) == 0._RD, 'eddy viscosity does not support rotation')
-         @:ASSERT(gr%pt(j)%s == gr%pt(1)%s, 'eddy viscosity does not support segment matching')
       end do
       if (tdc_visc_coeff(ml, gr%pt(gr%n), os_p%tdc_alpha_M) > 0._RD) then
          @:ASSERT(os_p%outer_bound == 'VACUUM' .OR. os_p%outer_bound == 'ZERO_R', 'viscous surface requires VACUUM or ZERO_R')
@@ -174,7 +218,7 @@ contains
       class(model_t), pointer :: ml
 
       ml => cx%model()
-      vp%de = gyre_nad_diff_eqns_t(cx, pt, os_p)
+      if (pt%x > 0._RD) vp%de = gyre_nad_diff_eqns_t(cx, pt, os_p)
       vp%x = pt%x
       vp%l = cx%l
       vp%V = ml%coeff(I_V_2, pt)*pt%x**2
@@ -190,9 +234,26 @@ contains
       vp%kap_rho = os_p%alpha_kar*ml%coeff(I_KAP_RHO, pt)
       vp%C = vp%V*vp%nabla_ad
       vp%K = ml%coeff(I_U, pt) + vp%l - ml%coeff(I_AS, pt) - vp%V_g
-      vp%c_visc = tdc_visc_coeff(ml, pt, os_p%tdc_alpha_M)
+      ! The central block does not evaluate the singular stress scaling at x = 0.
+
+      vp%c_visc = 0._RD
+      vp%dc_visc = 0._RD
+      if (pt%x > 0._RD) vp%c_visc = tdc_visc_coeff(ml, pt, os_p%tdc_alpha_M)
+      if (vp%c_visc > 0._RD) then
+         vp%dc_visc = ml%dcoeff(I_TDC_ALPHA_MLT, pt) + ml%dcoeff(I_TDC_HP, pt) &
+            + ml%dcoeff(I_TDC_A0, pt) + 0.5_RD*(ml%dcoeff(I_C_1, pt) &
+            - ml%dcoeff(I_TDC_M, pt) - ml%dcoeff(I_TDC_R, pt))
+         select type (ml)
+         type is (evol_model_t)
+            vp%dc_visc = ml%dcoeff(I_TDC_ALPHA_MLT, pt) + ml%dcoeff(I_TDC_HP, pt) &
+               + ml%dcoeff(I_TDC_A0, pt) + ml%dcoeff(I_C_1, pt)-2._RD
+         end select
+         if (os_p%tdc_alpha_M == -1._RD) vp%dc_visc = vp%dc_visc + ml%dcoeff(I_TDC_ALPHA_M, pt)
+      end if
       vp%alpha_grv = os_p%alpha_grv
-      vp%perturb_Pturb = os_p%conv_scheme == 'PERTURBED_TDC_LOCAL' .AND. os_p%tdc_perturb_mlt_Pturb
+      vp%alpha_omg = cx%alpha_omg
+      vp%rht = 0.25_RD*os_p%alpha_rht*ml%coeff(I_C_THN, pt)
+      vp%perturb_Pturb = os_p%conv_scheme == 'PERTURBED_TDC_LOCAL' .AND. os_p%tdc_include_Pturb .AND. pt%x > 0._RD
       if (vp%perturb_Pturb) call eval_tdc_turb_bg(ml, pt, os_p%tdc_yenv_scheme, vp%bg)
       select case (os_p%conv_scheme)
       case ('FROZEN_PESNELL_1')
@@ -213,22 +274,25 @@ contains
       class(state_ct), intent(in) :: st
       complex(RD), intent(out) :: Q(6,8), normal(8)
 
-      complex(RD) :: F, N(6), eos(6), row(6), denom
+      complex(RD) :: F, N(6), eos(6), row(6), denom, i_omega, f_rht, C
       integer :: i
 
-      F = (0._RD,1._RD)*st%omega*vp%c_visc
+      i_omega = (0._RD,1._RD)*SQRT(CMPLX(vp%alpha_omg,KIND=RD))*st%omega
+      F = i_omega*vp%c_visc
+      f_rht = 1._RD - vp%rht*i_omega
+      C = vp%C/f_rht
       eos = 0._RD
       if (vp%perturb_Pturb .AND. vp%c_visc /= 0._RD) then
          call eval_tdc_turb_row_gyre(vp%bg, vp%x, vp%l, vp%V, vp%c_1, vp%Gamma_1, &
             vp%ups_T, vp%nabla_ad, vp%nabla, vp%c_lum, vp%c_rad, vp%kap_T, vp%kap_rho, &
-            (0._RD,1._RD)*st%omega, CMPLX(1._RD,KIND=RD), .TRUE., row, eos)
+            i_omega, f_rht, .TRUE., row, eos)
       end if
       eos(2) = eos(2) + 1._RD
       N = (4._RD/3._RD)*F*vp%V_g*eos
       N(1) = N(1) - (4._RD/3._RD)*F*(vp%V_g - 3._RD)
       N(5) = N(5) - (4._RD/3._RD)*F*vp%ups_T
 
-      ! z_2 = y_2 - n; z_5 = y_5 + C*n.
+      ! z_2 = y_2 - n; z_5 = y_5 + (V*nabla_ad/f_rht)*n.
 
       Q = 0._RD
       do i = 1, 6
@@ -236,11 +300,11 @@ contains
       end do
       normal = MATMUL(N,Q)
       normal(7) = -2._RD*F*vp%l*(vp%l+1)
-      denom = 1._RD - N(2) + vp%C*N(5)
+      denom = 1._RD - N(2) + C*N(5)
       @:ASSERT(ABS(denom) > TINY(1._RD), 'singular normal viscous traction relation')
       normal = normal/denom
       Q(2,:) = Q(2,:) + normal
-      Q(5,:) = Q(5,:) - vp%C*normal
+      Q(5,:) = Q(5,:) - C*normal
 
    end subroutine mapping_
 
@@ -250,30 +314,33 @@ contains
 
       type(tdc_visc_pt_t), intent(in) :: vp
       class(state_ct), intent(in) :: st
-      real(RD), intent(in) :: dC
+      complex(RD), intent(in) :: dC
       complex(RD), intent(out) :: A(7,8)
 
-      complex(RD) :: B(6,6), Q(6,8), normal(8), H(6), F, om2
+      complex(RD) :: B(6,6), Q(6,8), normal(8), H(6), F, om2, i_omega, f_rht, C
       real(RD) :: L
 
       call vp%de%eval(st, vp%x, B)
       call mapping_(vp, st, Q, normal)
       L = REAL(vp%l*(vp%l+1),RD)
-      om2 = vp%c_1*st%omega**2
-      F = (0._RD,1._RD)*st%omega*vp%c_visc
+      om2 = vp%c_1*vp%alpha_omg*st%omega**2
+      i_omega = (0._RD,1._RD)*SQRT(CMPLX(vp%alpha_omg,KIND=RD))*st%omega
+      F = i_omega*vp%c_visc
+      f_rht = 1._RD - vp%rht*i_omega
+      C = vp%C/f_rht
 
       ! Restore horizontal displacement before applying viscous momentum.
 
       H = 0._RD
       H(1) = L
-      H(5) = L*vp%V*(vp%nabla_ad - vp%nabla)
+      H(5) = L*vp%V*(vp%nabla_ad - vp%nabla)/f_rht
       H(6) = L*vp%f_conv
       B(:,2) = B(:,2) - H/om2
       B(:,3) = B(:,3) - vp%alpha_grv*H/om2
       A(1:6,:) = MATMUL(B,Q)
       A(1:6,7) = A(1:6,7) + H
-      A(5,:) = A(5,:) + (dC-vp%C*vp%K)*normal
-      A(5,8) = A(5,8) + vp%C*L
+      A(5,:) = A(5,:) + (dC-C*vp%K)*normal
+      A(5,8) = A(5,8) + C*L
       A(2,:) = A(2,:) + vp%K*normal
       A(2,8) = A(2,8) - L
       A(7,:) = Q(2,:) + vp%alpha_grv*Q(3,:) + 0.5_RD*normal
@@ -284,30 +351,43 @@ contains
 
    !****
 
-   function tdc_visc_block_t_(cx, gr, j, os_p) result(db)
+   function tdc_visc_block_t_(cx, gr, j, os_p, diff_scheme) result(db)
 
       type(context_t), pointer, intent(in) :: cx
       type(grid_t), intent(in) :: gr
       integer, intent(in) :: j
       type(osc_par_t), intent(in) :: os_p
+      character(*), intent(in), optional :: diff_scheme
       type(tdc_visc_block_t) :: db
 
       type(point_t) :: pt
       class(model_t), pointer :: ml
-      real(RD) :: C_a, C_b
+      real(RD) :: nu_0, alpha
 
       ml => cx%model()
       pt = gr%pt(j)
       db%dx = gr%pt(j+1)%x - pt%x
       pt%x = pt%x + 0.5_RD*db%dx
       db%mid = tdc_visc_pt_t(cx, pt, os_p)
+      db%central = gr%pt(j)%x == 0._RD .AND. db%mid%c_visc > 0._RD
+      if (db%central) then
+         alpha = os_p%tdc_alpha_M
+         if (alpha == -1._RD) alpha = ml%coeff(I_TDC_ALPHA_M, gr%pt(j))
+         nu_0 = alpha*ml%coeff(I_TDC_ALPHA_MLT, gr%pt(j))*ml%coeff(I_TDC_HP, gr%pt(j)) &
+            *ml%coeff(I_TDC_A0, gr%pt(j))
+         @:ASSERT(IEEE_IS_FINITE(nu_0) .AND. nu_0 > 0._RD, 'REGULAR requires positive central viscosity or an inviscid first interval')
+         db%right = tdc_visc_pt_t(cx, gr%pt(j+1), os_p)
+      end if
       db%x_b = gr%pt(j+1)%x
       db%c_visc_b = tdc_visc_coeff(ml, gr%pt(j+1), os_p%tdc_alpha_M)
       db%c_1_b = ml%coeff(I_C_1, gr%pt(j+1))
-      C_a = ml%coeff(I_V_2, gr%pt(j))*gr%pt(j)%x**2*ml%coeff(I_NABLA_AD, gr%pt(j))
-      C_b = ml%coeff(I_V_2, gr%pt(j+1))*gr%pt(j+1)%x**2*ml%coeff(I_NABLA_AD, gr%pt(j+1))
-      db%dC = pt%x*(C_b-C_a)/db%dx
+      db%C_a = ml%coeff(I_V_2, gr%pt(j))*gr%pt(j)%x**2*ml%coeff(I_NABLA_AD, gr%pt(j))
+      db%C_b = ml%coeff(I_V_2, gr%pt(j+1))*gr%pt(j+1)%x**2*ml%coeff(I_NABLA_AD, gr%pt(j+1))
+      db%rht_a = 0.25_RD*os_p%alpha_rht*ml%coeff(I_C_THN, gr%pt(j))
+      db%rht_b = 0.25_RD*os_p%alpha_rht*ml%coeff(I_C_THN, gr%pt(j+1))
       db%last = j == gr%n-1
+      db%surface = db%last
+      if (.NOT. db%last) db%last = gr%pt(j+1)%s /= gr%pt(j+2)%s
       db%n_e = MERGE(6,8,cx%l == 0)
       if (db%last) then
          db%dx_h = 0.5_RD*db%dx
@@ -316,8 +396,78 @@ contains
          db%dx_h = 0.5_RD*(gr%pt(j+2)%x - gr%pt(j)%x)
          db%w_h = (db%dx_h - 0.5_RD*db%dx)/db%dx_h
       end if
+      if (PRESENT(diff_scheme)) then
+         @:ASSERT(ANY(diff_scheme == ['COLLOC_GL2','MAGNUS_GL2']), 'invalid viscous difference scheme')
+         if (diff_scheme == 'MAGNUS_GL2' .AND. .NOT. db%central) &
+            db%magnus = magnus_gl2_block_ct(diff_eqns_factory_, gr%pt(j), gr%pt(j+1), regularize=.FALSE.)
+      end if
+
+   contains
+
+      subroutine diff_eqns_factory_(pt, de)
+
+         type(point_t), intent(in) :: pt(:)
+         class(diff_eqns_ct), allocatable, intent(out) :: de(:)
+
+         type(tdc_visc_diff_eqns_t) :: visc_de
+
+         @:ASSERT(SIZE(pt) == 1, 'viscous Magnus requires one quadrature point')
+         visc_de%n_e = db%n_e
+         if (db%mid%c_visc == 0._RD) visc_de%n_e = 6
+         visc_de%vp = db%mid
+         visc_de%dx = db%dx
+         visc_de%C_a = db%C_a
+         visc_de%C_b = db%C_b
+         visc_de%rht_a = db%rht_a
+         visc_de%rht_b = db%rht_b
+         de = [visc_de]
+
+      end subroutine diff_eqns_factory_
 
    end function tdc_visc_block_t_
+
+   !****
+
+   subroutine eval_diff_eqns_(this, st, del, A, r, trans)
+
+      class(tdc_visc_diff_eqns_t), intent(in) :: this
+      class(state_ct), intent(in) :: st
+      real(RD), intent(in) :: del
+      complex(RD), intent(out) :: A(:,:)
+      complex(RD), intent(out), optional :: r(:)
+      logical, intent(in), optional :: trans
+
+      complex(RD) :: B(7,8), i_omega, dC, om2
+
+      if (PRESENT(r)) then
+         @:ABORT('eddy viscosity does not support inhomogeneous forcing')
+      end if
+      if (this%vp%c_visc == 0._RD) then
+         call this%vp%de%eval(st, del, A, trans=trans)
+         return
+      end if
+      i_omega = (0._RD,1._RD)*SQRT(CMPLX(this%vp%alpha_omg,KIND=RD))*st%omega
+      dC = this%vp%x*(this%C_b/(1._RD-this%rht_b*i_omega) &
+         - this%C_a/(1._RD-this%rht_a*i_omega))/this%dx
+      call equations_(this%vp, st, dC, B)
+      A = 0._RD
+      A(1:6,:) = B(1:6,:this%n_e)
+      if (this%n_e == 8) then
+         A(8,:) = B(7,:)
+
+         ! Freeze h - (z_2 + alpha_grv*z_3)/(c_1*omega^2), not h.
+         ! This retains the ordinary six-variable Magnus limit at zero viscosity.
+
+         om2 = this%vp%c_1*this%vp%alpha_omg*st%omega**2
+         A(:,2) = A(:,2) + A(:,7)/om2
+         A(:,3) = A(:,3) + this%vp%alpha_grv*A(:,7)/om2
+      end if
+      A = (del/this%vp%x)*A
+      if (PRESENT(trans)) then
+         if (trans) A = TRANSPOSE(A)
+      end if
+
+   end subroutine eval_diff_eqns_
 
    !****
 
@@ -330,11 +480,33 @@ contains
       complex(RD), contiguous, intent(out), optional :: F(:)
       logical, intent(in), optional :: trans
 
-      complex(RD) :: A(7,8), W(this%n_e,2*this%n_e), Fb
+      complex(RD) :: A(7,8), W(this%n_e,2*this%n_e), M(this%n_e,2*this%n_e)
+      complex(RD) :: Fb, i_omega, dC, om2
       real(RD) :: d, scale
       integer :: i, n
 
-      call equations_(this%mid, st, this%dC, A)
+      if (this%central) then
+         call eval_center_(this, st, W)
+         if (PRESENT(trans)) then
+            if (trans) then
+               E = TRANSPOSE(W)
+            else
+               E = W
+            end if
+         else
+            E = W
+         end if
+         scl = ONE_CT
+         if (PRESENT(F)) then
+            @:ABORT('eddy viscosity does not support inhomogeneous forcing')
+         end if
+         return
+      end if
+
+      i_omega = (0._RD,1._RD)*SQRT(CMPLX(this%mid%alpha_omg,KIND=RD))*st%omega
+      dC = this%mid%x*(this%C_b/(1._RD-this%rht_b*i_omega) &
+         - this%C_a/(1._RD-this%rht_a*i_omega))/this%dx
+      call equations_(this%mid, st, dC, A)
       n = this%n_e
       d = this%dx/this%mid%x
       W = 0._RD
@@ -357,19 +529,26 @@ contains
          ! Give the inviscid algebraic relation a frequency-independent h pivot.
 
          if (this%mid%c_visc == 0._RD) &
-            W(7,:) = W(7,:)/(d*this%mid%c_1*st%omega**2)
+            W(7,:) = W(7,:)/(d*this%mid%c_1*this%mid%alpha_omg*st%omega**2)
 
          ! Keep the constitutive relation implicit when viscosity vanishes.
 
-         Fb = (0._RD,1._RD)*st%omega*this%c_visc_b
+         Fb = i_omega*this%c_visc_b
          if (this%last) then
             if (this%c_visc_b > 0._RD) then
-               W(8,7) = -this%x_b/this%dx_h
-               W(8,15) = this%x_b/this%dx_h + this%mid%l-2
-               W(8,9) = 1._RD
+               if (this%surface) then
+                  W(8,7) = -this%x_b/this%dx_h
+                  W(8,15) = this%x_b/this%dx_h + this%mid%l-2
+                  W(8,9) = 1._RD
+               else
+                  W(8,7) = -Fb*this%x_b/this%dx_h
+                  W(8,15) = Fb*(this%x_b/this%dx_h + this%mid%l-2)
+                  W(8,9) = Fb
+                  W(8,16) = 1._RD
+               end if
             else
                ! At an inviscid surface y_2 = z_2.
-               W(8,10) = 1._RD/(this%c_1_b*st%omega**2)
+               W(8,10) = 1._RD/(this%c_1_b*this%mid%alpha_omg*st%omega**2)
                W(8,11) = this%mid%alpha_grv*W(8,10)
                W(8,15) = -1._RD
             end if
@@ -380,8 +559,336 @@ contains
             W(8,16) = 1._RD
          end if
          scale = MAX(1._RD, this%c_visc_b*(this%x_b/this%dx_h+ABS(this%mid%l-2)+1._RD))
-         if (this%last .AND. this%c_visc_b > 0._RD) scale = MAX(1._RD, this%x_b/this%dx_h)
+         if (this%surface .AND. this%c_visc_b > 0._RD) scale = MAX(1._RD, this%x_b/this%dx_h)
          W(8,:) = W(8,:)/scale
+      end if
+      scl = ONE_CT
+      if (ALLOCATED(this%magnus)) then
+         if (this%mid%c_visc == 0._RD) then
+            call this%magnus%eval(st, M(:6,:12), scl)
+            W(1:6,:) = 0._RD
+            W(1:6,1:6) = -M(:6,:6)
+            W(1:6,n+1:n+6) = -M(:6,7:12)
+         else
+            call this%magnus%eval(st, M, scl)
+            W(1:6,:) = -M(1:6,:)
+         end if
+         if (n == 8 .AND. this%mid%c_visc > 0._RD) then
+            W(7,:) = -M(8,:)
+            W(1:7,7) = W(1:7,7) + W(1:7,15)
+            W(1:7,15) = 0._RD
+            om2 = this%mid%c_1*this%mid%alpha_omg*st%omega**2
+            W(1:7,2) = W(1:7,2) - W(1:7,7)/(2._RD*om2)
+            W(1:7,10) = W(1:7,10) - W(1:7,7)/(2._RD*om2)
+            W(1:7,3) = W(1:7,3) - this%mid%alpha_grv*W(1:7,7)/(2._RD*om2)
+            W(1:7,11) = W(1:7,11) - this%mid%alpha_grv*W(1:7,7)/(2._RD*om2)
+         end if
+         ! Apply the native thermal regularization to both block sizes.
+
+         scl = scl*exp(ext_ct(-sqrt(d**2*A(5,6)*A(6,5))))
+      end if
+      if (PRESENT(trans)) then
+         if (trans) then
+            E = TRANSPOSE(W)
+         else
+            E = W
+         end if
+      else
+         E = W
+      end if
+      if (PRESENT(F)) then
+         @:ABORT('eddy viscosity does not support inhomogeneous forcing')
+      end if
+
+   end subroutine eval_block_
+
+   !****
+
+   subroutine center_polynomial_(l, u, b, y, dy, d2y, h, dh, d2h)
+
+      integer, intent(in) :: l
+      real(RD), intent(in) :: u
+      complex(RD), intent(in) :: b(:)
+      complex(RD), intent(out) :: y(6), dy(6), d2y(6), h, dh, d2h
+
+      complex(RD) :: y0(6), y2(6), y4(6), h0, h2
+
+      ! Regular scalar and spheroidal vector harmonics; d = x*d/dx.
+
+      y0 = 0._RD
+      y2 = 0._RD
+      y4 = 0._RD
+      h0 = 0._RD
+      h2 = 0._RD
+      if (l == 0) then
+         y0(2) = b(2)
+         y0(3) = b(3)
+         y2 = [b(1),b(5),b(6),b(7),b(8),b(9)]
+         y4(1) = b(4)
+      else
+         y0 = [b(1),b(2),b(3),l*b(3),(0._RD,0._RD),b(4)]
+         y2 = b(5:10)
+         h0 = b(1)/l
+         h2 = b(11)
+      end if
+      y = y0 + u**2*y2 + u**4*y4
+      dy = 2._RD*u**2*y2 + 4._RD*u**4*y4
+      d2y = 4._RD*u**2*y2 + 16._RD*u**4*y4
+      h = h0 + u**2*h2
+      dh = 2._RD*u**2*h2
+      d2h = 4._RD*u**2*h2
+
+   end subroutine center_polynomial_
+
+   !****
+
+   subroutine center_fields_(vp, st, u, b, y, dy, h, dh, n, dn, t, dt)
+
+      type(tdc_visc_pt_t), intent(in) :: vp
+      class(state_ct), intent(in) :: st
+      real(RD), intent(in) :: u
+      complex(RD), intent(in) :: b(:)
+      complex(RD), intent(out) :: y(6), dy(6), h, dh, n, dn, t, dt
+
+      complex(RD) :: d2y(6), d2h, F
+      real(RD) :: ll
+
+      call center_polynomial_(vp%l, u, b, y, dy, d2y, h, dh, d2h)
+      ll = REAL(vp%l*(vp%l+1),RD)
+      F = (0._RD,1._RD)*SQRT(CMPLX(vp%alpha_omg,KIND=RD))*st%omega*vp%c_visc
+      n = -F*((4._RD/3._RD)*(dy(1)+(vp%l-2)*y(1))+(2._RD/3._RD)*ll*h)
+      dn = vp%dc_visc*n-F*((4._RD/3._RD)*(d2y(1)+(vp%l-2)*dy(1))+(2._RD/3._RD)*ll*dh)
+      t = -F*(dh+(vp%l-2)*h+y(1))
+      dt = vp%dc_visc*t-F*(d2h+(vp%l-2)*dh+dy(1))
+      if (vp%l == 0) then
+         t = 0._RD
+         dt = 0._RD
+      end if
+
+   end subroutine center_fields_
+
+   !****
+
+   subroutine center_coeff_(db, st, P)
+
+      type(tdc_visc_block_t), intent(in) :: db
+      class(state_ct), intent(in) :: st
+      complex(RD), intent(out) :: P(11,4)
+
+      complex(RD) :: A(6,6), Hrow(6), R(7,11), M(7,7), rhs(7,4), b(11)
+      complex(RD) :: y(6), dy(6), h, dh, n, dn, t, dt, ar, ah, F, C, om2, i_omega
+      real(RD) :: ll, scale, col_scale(7)
+      integer :: k, nf, nc, ne, info
+
+      nf = MERGE(3,4,db%mid%l == 0)
+      ne = MERGE(6,7,db%mid%l == 0)
+      nc = nf+ne
+      associate(vp => db%mid)
+         ll = REAL(vp%l*(vp%l+1),RD)
+         om2 = vp%c_1*vp%alpha_omg*st%omega**2
+         i_omega = (0._RD,1._RD)*SQRT(CMPLX(vp%alpha_omg,KIND=RD))*st%omega
+         F = i_omega*vp%c_visc
+         C = vp%C/(1._RD-vp%rht*i_omega)
+         call vp%de%eval(st, vp%x, A)
+         Hrow = 0._RD
+         Hrow(1) = ll
+         Hrow(5) = ll*vp%V*(vp%nabla_ad-vp%nabla)/(1._RD-vp%rht*i_omega)
+         Hrow(6) = ll*vp%f_conv
+         A(:,2) = A(:,2)-Hrow/om2
+         A(:,3) = A(:,3)-vp%alpha_grv*Hrow/om2
+         do k = 1, nc
+            b = 0._RD
+            b(k) = 1._RD
+            call center_fields_(vp, st, 0.5_RD, b, y, dy, h, dh, n, dn, t, dt)
+            ar = dn+vp%K*n-ll*t
+            ah = dt+vp%K*t-0.5_RD*n-F*(2._RD-ll)*h
+            R(1:6,k) = dy-MATMUL(A,y)-Hrow*h
+            R(2,k) = R(2,k)-ar
+            R(5,k) = R(5,k)+C*ar
+            R(7,k) = om2*h-y(2)-vp%alpha_grv*y(3)+ah
+         end do
+      end associate
+
+      ! Condense the curvature coefficients, retaining the regular amplitudes.
+
+      M(:ne,:ne) = R(:ne,nf+1:nc)
+      rhs(:ne,:nf) = -R(:ne,:nf)
+      do k = 1, ne
+         scale = MAXVAL(ABS(M(k,:ne)))
+         @:ASSERT(scale > TINY(1._RD), 'singular viscous central block')
+         M(k,:ne) = M(k,:ne)/scale
+         rhs(k,:nf) = rhs(k,:nf)/scale
+      end do
+      do k = 1, ne
+         col_scale(k) = MAXVAL(ABS(M(:ne,k)))
+         @:ASSERT(col_scale(k) > TINY(1._RD), 'singular viscous central block')
+         M(:ne,k) = M(:ne,k)/col_scale(k)
+      end do
+      call LA_GESV(M(:ne,:ne), rhs(:ne,:nf), INFO=info)
+      @:ASSERT(info == 0, 'singular viscous central block; refine the central interval')
+      P = 0._RD
+      do k = 1, nf
+         P(k,k) = 1._RD
+      end do
+      do k = 1, ne
+         P(nf+k,:nf) = rhs(k,:nf)/col_scale(k)
+      end do
+
+   end subroutine center_coeff_
+
+   !****
+
+   subroutine eval_center_(db, st, W)
+
+      type(tdc_visc_block_t), intent(in) :: db
+      class(state_ct), intent(in) :: st
+      complex(RD), intent(out) :: W(:,:)
+
+      complex(RD) :: P(11,4), y(6), dy(6), h, dh, n, dn, t, dt, C, i_omega
+      integer :: k, nf, ne
+
+      call center_coeff_(db, st, P)
+      nf = MERGE(3,4,db%mid%l == 0)
+      ne = db%n_e
+      i_omega = (0._RD,1._RD)*SQRT(CMPLX(db%mid%alpha_omg,KIND=RD))*st%omega
+      C = db%right%C/(1._RD-db%right%rht*i_omega)
+      W = 0._RD
+      do k = 1, nf
+         call center_fields_(db%right, st, 1._RD, P(:,k), y, dy, h, dh, n, dn, t, dt)
+         W(1:6,k) = y
+         W(2,k) = y(2)-n
+         W(5,k) = y(5)+C*n
+         if (ne == 8) then
+            W(7,k) = h
+            if (.NOT. db%last) W(7,k) = h+(db%dx_h-0.5_RD*db%dx)*dh/db%x_b
+            W(8,k) = t
+         end if
+      end do
+      do k = 1, ne
+         W(k,ne+k) = -1._RD
+      end do
+
+   end subroutine eval_center_
+
+   !****
+
+   subroutine tdc_visc_center_y(db, st, z, y, xi_h, h_b)
+
+      type(tdc_visc_block_t), intent(in) :: db
+      class(state_ct), intent(in) :: st
+      complex(RD), intent(in) :: z(:)
+      complex(RD), intent(out) :: y(6), xi_h
+      complex(RD), intent(out), optional :: h_b
+
+      complex(RD) :: P(11,4), b(11), dy(6), d2y(6), h, dh, d2h
+      integer :: nf
+
+      nf = MERGE(3,4,db%mid%l == 0)
+      call center_coeff_(db, st, P)
+      b = MATMUL(P(:,:nf),z(:nf))
+      if (PRESENT(h_b)) call center_polynomial_(db%mid%l, 1._RD, b, y, dy, d2y, h_b, dh, d2h)
+      call center_polynomial_(db%mid%l, 0._RD, b, y, dy, d2y, h, dh, d2h)
+      xi_h = 0._RD
+      if (db%mid%l == 1) xi_h = h
+
+   end subroutine tdc_visc_center_y
+
+   !****
+
+   function tdc_visc_match_t_(cx, gr, j, os_p) result(mb)
+
+      type(context_t), pointer, intent(in) :: cx
+      type(grid_t), intent(in) :: gr
+      integer, intent(in) :: j
+      type(osc_par_t), intent(in) :: os_p
+      type(tdc_visc_match_t) :: mb
+
+      class(model_t), pointer :: ml
+      integer :: k
+
+      ml => cx%model()
+      @:ASSERT(gr%pt(j)%x == gr%pt(j+1)%x, 'unequal segment boundary radii')
+      do k = 1, 2
+         mb%vp(k) = tdc_visc_pt_t(cx, gr%pt(j+k-1), os_p)
+         mb%U(k) = ml%coeff(I_U, gr%pt(j+k-1))
+      end do
+      mb%dx_h = 0.5_RD*(gr%pt(j+2)%x-gr%pt(j+1)%x)/gr%pt(j+1)%x
+      mb%n_e = MERGE(6,8,cx%l == 0)
+
+   end function tdc_visc_match_t_
+
+   !****
+
+   subroutine eval_match_(this, st, E, scl, F, trans)
+
+      class(tdc_visc_match_t), intent(in) :: this
+      class(state_ct), intent(in) :: st
+      complex(RD), contiguous, intent(out) :: E(:,:)
+      type(ext_ct), intent(out) :: scl
+      complex(RD), contiguous, intent(out), optional :: F(:)
+      logical, intent(in), optional :: trans
+
+      complex(RD) :: Q(6,8), normal(8), Y(6,16,2), W(this%n_e,2*this%n_e), h(16), Fb
+      integer :: k, n, a
+      real(RD) :: scale
+      logical :: coupled
+
+      n = this%n_e
+      coupled = n == 8 .AND. ALL(this%vp%c_visc > 0._RD)
+      Y = 0._RD
+      do k = 1, 2
+         a = (k-1)*n
+         call mapping_(this%vp(k), st, Q, normal)
+         h = 0._RD
+         if (n == 8) then
+            if (k == 1 .OR. coupled) then
+               h(7) = 1._RD
+            else
+               h(n+7) = 1._RD
+               h(n+1) = this%dx_h
+               h = h/(1._RD-(this%vp(k)%l-2)*this%dx_h)
+            end if
+         end if
+         Y(:,a+1:a+6,k) = Q(:,:6)
+         if (n == 8) Y(:,a+8,k) = Q(:,8)
+         do a = 1, 2*n
+            Y(:,a,k) = Y(:,a,k) + Q(:,7)*h(a)
+         end do
+      end do
+      W = 0._RD
+      W(1,1) = 1._RD
+      W(1,n+1) = -1._RD
+      W(2,1) = -this%U(1)
+      W(2,2) = this%U(1)
+      W(2,n+1) = this%U(2)
+      W(2,n+2) = -this%U(2)
+      W(3,3) = 1._RD
+      W(3,n+3) = -1._RD
+      W(4,1) = this%U(1)
+      W(4,4) = 1._RD
+      W(4,n+1) = -this%U(2)
+      W(4,n+4) = -1._RD
+      W(5,:) = Y(5,:2*n,1)+this%vp(1)%C*(Y(2,:2*n,1)-Y(1,:2*n,1)) &
+         - Y(5,:2*n,2)-this%vp(2)%C*(Y(2,:2*n,2)-Y(1,:2*n,2))
+      W(6,6) = 1._RD
+      W(6,n+6) = -1._RD
+      if (n == 8) then
+         if (coupled) then
+            W(7,8) = this%U(1)
+            W(7,16) = -this%U(2)
+            Fb = (0._RD,1._RD)*SQRT(CMPLX(this%vp(2)%alpha_omg,KIND=RD))*st%omega*this%vp(2)%c_visc
+            W(8,7) = Fb*(this%vp(2)%l-2-1._RD/this%dx_h)
+            W(8,9) = Fb
+            W(8,15) = Fb/this%dx_h
+            W(8,16) = 1._RD
+            W(7,:) = W(7,:)/MAXVAL(this%U)
+            scale = MAX(1._RD, this%vp(2)%c_visc*(1._RD/this%dx_h+ABS(this%vp(2)%l-2)+1._RD))
+            W(8,:) = W(8,:)/scale
+         else
+            ! An inviscid side cannot transmit tangential traction.
+            W(7,8) = 1._RD
+            W(8,16) = 1._RD
+         end if
       end if
       if (PRESENT(trans)) then
          if (trans) then
@@ -397,17 +904,165 @@ contains
          @:ABORT('eddy viscosity does not support inhomogeneous forcing')
       end if
 
-   end subroutine eval_block_
+   end subroutine eval_match_
 
    !****
 
-   function tdc_visc_bound_t_(bc, vp, inner, dx_h, outer_bound) result(vb)
+   function tdc_visc_h(vp, gr, z, j) result(h)
+
+      type(tdc_visc_pt_t), intent(in) :: vp(:)
+      type(grid_t), intent(in) :: gr
+      complex(RD), intent(in) :: z(:,:)
+      integer, intent(in) :: j
+      complex(RD) :: h
+
+      real(RD) :: d, w
+      logical :: inner, outer
+
+      h = 0._RD
+      if (SIZE(z,1) == 6 .OR. gr%pt(j)%x == 0._RD) return
+      inner = j == 1
+      outer = j == gr%n
+      if (.NOT. inner) inner = gr%pt(j-1)%s /= gr%pt(j)%s
+      if (.NOT. outer) outer = gr%pt(j+1)%s /= gr%pt(j)%s
+      if (inner) then
+         if (j > 1) then
+            if (vp(j-1)%c_visc > 0._RD .AND. vp(j)%c_visc > 0._RD) then
+               h = z(7,j-1)
+               return
+            end if
+         end if
+         d = 0.5_RD*(gr%pt(j+1)%x-gr%pt(j)%x)/gr%pt(j)%x
+         h = (z(7,j)+d*z(1,j))/(1._RD-(vp(j)%l-2)*d)
+      else if (outer) then
+         h = z(7,j)
+      else
+         w = (gr%pt(j+1)%x-gr%pt(j)%x)/(gr%pt(j+1)%x-gr%pt(j-1)%x)
+         h = w*z(7,j-1)+(1._RD-w)*z(7,j)
+      end if
+
+   end function tdc_visc_h
+
+   !****
+
+   subroutine tdc_visc_work(cx, vp, gr, os_p, st, z, power, force, boundary)
+
+      type(context_t), pointer, intent(in) :: cx
+      type(tdc_visc_pt_t), intent(in) :: vp(:)
+      type(grid_t), intent(in) :: gr
+      type(osc_par_t), intent(in) :: os_p
+      class(state_ct), intent(in) :: st
+      complex(RD), intent(in) :: z(:,:)
+      real(RD), intent(out) :: power(:)
+      real(RD), intent(out), optional :: force(:), boundary(:)
+
+      class(model_t), pointer :: ml
+      type(tdc_visc_block_t) :: db, first
+      type(point_t) :: pt
+      complex(RD) :: Q(6,8), normal(8), v(8), F, rr, h, shear, i_omega
+      complex(RD) :: y(6), dy(6), dh, nr, dn, tr, dt, ar, ah, h_center
+      complex(RD) :: P(11,4), b(11), normal_pt(gr%n), shear_pt(gr%n)
+      real(RD) :: L, w, shear_power(gr%n), flux(gr%n), force_cell(gr%n), bound_cell(gr%n)
+      integer :: j, n, nf
+
+      ! Phase-averaged loss in units of G*M_star**2/(R_star*t_dyn).
+
+      ml => cx%model()
+      n = SIZE(z,1)
+      L = REAL(cx%l*(cx%l+1),RD)
+      power = 0._RD
+      if (PRESENT(force)) force = 0._RD
+      if (PRESENT(boundary)) boundary = 0._RD
+      if (st%omega == 0._RD) return
+      i_omega = (0._RD,1._RD)*SQRT(CMPLX(vp(1)%alpha_omg,KIND=RD))*st%omega
+      first = tdc_visc_block_t(cx, gr, 1, os_p)
+      if (first%central) then
+         nf = MERGE(3,4,cx%l == 0)
+         call center_coeff_(first, st, P)
+         b = MATMUL(P(:,:nf),z(:nf,1))
+         call center_fields_(first%right, st, 1._RD, b, y, dy, h_center, dh, nr, dn, tr, dt)
+      end if
+      shear_power = 0._RD
+      normal_pt = 0._RD
+      shear_pt = 0._RD
+      flux = 0._RD
+      force_cell = 0._RD
+      bound_cell = 0._RD
+      do j = 1, gr%n
+         if (gr%pt(j)%x == 0._RD) cycle
+         h = tdc_visc_h(vp, gr, z, j)
+         if (j == 2 .AND. first%central) h = h_center
+         v = 0._RD
+         v(:6) = z(:6,j)
+         v(7) = h
+         if (n == 8) v(8) = z(8,j)
+         call mapping_(vp(j), st, Q, normal)
+         y = MATMUL(Q,v)
+         normal_pt(j) = SUM(normal*v)
+         shear_pt(j) = v(8)
+         w = ml%coeff(I_U, gr%pt(j))/vp(j)%c_1**2*gr%pt(j)%x**(2*cx%l)
+         flux(j) = 0.5_RD*w*gr%pt(j)%x*REAL(CONJG(-i_omega) &
+            *(CONJG(y(1))*normal_pt(j)+L*CONJG(h)*shear_pt(j)),RD)
+         if (vp(j)%c_visc > 0._RD) then
+            shear = -shear_pt(j)/(i_omega*vp(j)%c_visc)
+            shear_power(j) = 0.5_RD*L*w*vp(j)%c_visc*ABS(st%omega)**2*ABS(shear)**2
+         end if
+      end do
+      do j = 1, gr%n-1
+         if (gr%pt(j)%s /= gr%pt(j+1)%s) cycle
+         db = tdc_visc_block_t(cx, gr, j, os_p)
+         bound_cell(j+1) = flux(j+1)-flux(j)
+         power(j+1) = -0.5_RD*db%dx*(shear_power(j)+shear_power(j+1))
+         F = i_omega*db%mid%c_visc
+         if (db%central) then
+            call center_fields_(db%mid, st, 0.5_RD, b, y, dy, h, dh, nr, dn, tr, dt)
+         else
+            v = 0._RD
+            v(:6) = 0.5_RD*(z(:6,j)+z(:6,j+1))
+            if (n == 8) then
+               v(7) = z(7,j)
+               v(8) = 0.5_RD*(z(8,j)+z(8,j+1))
+            end if
+            call mapping_(db%mid, st, Q, normal)
+            y = MATMUL(Q,v)
+            h = v(7)
+            nr = SUM(normal*v)
+            tr = v(8)
+            dn = db%mid%x*(normal_pt(j+1)-normal_pt(j))/db%dx
+            dt = db%mid%x*(shear_pt(j+1)-shear_pt(j))/db%dx
+         end if
+         pt = gr%pt(j)
+         pt%x = db%mid%x
+         w = ml%coeff(I_U, pt)/db%mid%c_1**2*pt%x**(2*cx%l)
+         ar = dn+db%mid%K*nr-L*tr
+         ah = dt+db%mid%K*tr-0.5_RD*nr-F*(2._RD-L)*h
+         force_cell(j+1) = 0.5_RD*db%dx*w*REAL(CONJG(-i_omega)*(CONJG(y(1))*ar+L*CONJG(h)*ah),RD)
+         if (db%mid%c_visc == 0._RD) cycle
+         w = w*db%mid%c_visc*ABS(st%omega)**2
+         rr = -nr/(2._RD*F)
+         if (db%central) power(j+1) = -0.5_RD*db%dx*w*L*ABS(tr/F)**2
+         power(j+1) = power(j+1)-db%dx*w*(1.5_RD*ABS(rr)**2+0.5_RD*L*(L-2._RD)*ABS(h)**2)
+      end do
+      do j = 2, gr%n
+         power(j) = power(j)+power(j-1)
+         force_cell(j) = force_cell(j)+force_cell(j-1)
+         bound_cell(j) = bound_cell(j)+bound_cell(j-1)
+      end do
+      if (PRESENT(force)) force = force_cell
+      if (PRESENT(boundary)) boundary = bound_cell
+
+   end subroutine tdc_visc_work
+
+   !****
+
+   function tdc_visc_bound_t_(bc, vp, inner, dx_h, outer_bound, central) result(vb)
 
       class(bound_conds_ct), intent(in) :: bc
       type(tdc_visc_pt_t), intent(in) :: vp
       logical, intent(in) :: inner
       real(RD), intent(in) :: dx_h
       character(*), intent(in) :: outer_bound
+      logical, intent(in), optional :: central
       type(tdc_visc_bound_t) :: vb
 
       vb%bc = bc
@@ -415,6 +1070,8 @@ contains
       vb%inner = inner
       vb%dx_h = dx_h
       vb%free_surface = .NOT. inner .AND. outer_bound == 'VACUUM'
+      vb%central = .FALSE.
+      if (PRESENT(central)) vb%central = central
       vb%n_e = MERGE(6,8,vp%l == 0)
       vb%n_b = MERGE(3,4,vp%l == 0)
 
@@ -431,27 +1088,35 @@ contains
       logical, intent(in), optional :: trans
 
       complex(RD) :: B0(3,6), Q(6,8), normal(8), W(this%n_b,this%n_e), h(8)
+      integer :: k
 
-      call this%bc%eval(st, B0)
-      call mapping_(this%vp, st, Q, normal)
-      if (this%inner .AND. this%n_e == 8) then
-         ! Extrapolate the cell displacement to the stress-free inner face.
-         h = 0._RD
-         h(7) = 1._RD
-         h(1) = this%dx_h/this%vp%x
-         h = h/(1._RD - (this%vp%l-2)*this%dx_h/this%vp%x)
-         Q(:,1) = Q(:,1) + Q(:,7)*h(1)
-         Q(:,7) = Q(:,7)*h(7)
-      end if
-      W(1:3,:) = MATMUL(B0,Q(:,1:this%n_e))
-      if (this%free_surface) then
-         W(1,:) = 0._RD
-         W(1,1) = 1._RD
-         W(1,2) = -1._RD
-      end if
-      if (this%n_e == 8) then
-         W(4,:) = 0._RD
-         W(4,8) = 1._RD
+      if (this%central) then
+         W = 0._RD
+         do k = 1, this%n_b
+            W(k,this%n_b+k) = 1._RD
+         end do
+      else
+         call this%bc%eval(st, B0)
+         call mapping_(this%vp, st, Q, normal)
+         if (this%inner .AND. this%n_e == 8 .AND. this%vp%x > 0._RD) then
+            ! Extrapolate the cell displacement to the stress-free inner face.
+            h = 0._RD
+            h(7) = 1._RD
+            h(1) = this%dx_h/this%vp%x
+            h = h/(1._RD - (this%vp%l-2)*this%dx_h/this%vp%x)
+            Q(:,1) = Q(:,1) + Q(:,7)*h(1)
+            Q(:,7) = Q(:,7)*h(7)
+         end if
+         W(1:3,:) = MATMUL(B0,Q(:,1:this%n_e))
+         if (this%free_surface) then
+            W(1,:) = 0._RD
+            W(1,1) = 1._RD
+            W(1,2) = -1._RD
+         end if
+         if (this%n_e == 8) then
+            W(4,:) = 0._RD
+            W(4,8) = 1._RD
+         end if
       end if
       if (PRESENT(trans)) then
          if (trans) then
@@ -484,10 +1149,10 @@ contains
       v(1:6) = z(1:6)
       v(7) = h
       y = MATMUL(Q,v)
-      xi_h = h*vp%x**(vp%l-1)
-      if (vp%l == 0) xi_h = 0._RD
+      xi_h = 0._RD
+      if (vp%l > 0) xi_h = h*vp%x**(vp%l-1)
       if (vp%c_visc == 0._RD .AND. vp%l /= 0) &
-         xi_h = (y(2)+vp%alpha_grv*y(3))/(vp%c_1*st%omega**2)*vp%x**(vp%l-1)
+         xi_h = (y(2)+vp%alpha_grv*y(3))/(vp%c_1*vp%alpha_omg*st%omega**2)*vp%x**(vp%l-1)
 
    end subroutine tdc_visc_transform
 

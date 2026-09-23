@@ -26,7 +26,9 @@ module ${P}$_nad_diff_eqns_m
    use forum_m, only: RD
 
    use context_m
+   use constants_m, only: G_GRAVITY
    use diff_eqns_m
+   use evol_model_m
    use linalg_m
    use math_m
    use model_m
@@ -154,6 +156,13 @@ contains
          call check_model(ml, [I_TDC_C_HFC,I_TDC_C_CONV])
          de%c_hfc = ml%coeff(I_TDC_C_HFC, pt)
          de%c_conv = ml%coeff(I_TDC_C_CONV, pt)
+         select type (ml)
+         type is (evol_model_t)
+            if (pt%x > 0._RD .AND. ml%is_defined(I_TDC_D_H)) then
+               de%c_hfc = ml%coeff(I_C_THK, pt)*ml%coeff(I_TDC_D_H, pt) &
+                  /SQRT(G_GRAVITY*ml%M_star/ml%R_star**3)/(ml%R_star*pt%x)**2
+            end if
+         end select
       end if
       de%c_thn = ml%coeff(I_C_THN, pt)
       de%dc_thn = ml%dcoeff(I_C_THN, pt)
@@ -376,7 +385,7 @@ contains
          if (tdc_local) then
             call eval_tdc_turb_row_gyre(this%tdc_bg, x, this%cx%l, V, c_1, Gamma_1, &
                ups_T, nabla_ad, nabla, c_lum, c_rad, kap_T, kap_rho, i_omega_c, &
-               f_rht, this%cx%tdc_perturb_mlt_Pturb, tdc_row_delta, &
+               f_rht, this%cx%tdc_include_Pturb, tdc_row_delta, &
                tdc_y2eos_delta)
 
             if (trans_) then

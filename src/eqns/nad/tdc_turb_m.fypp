@@ -24,6 +24,7 @@ module tdc_turb_m
    use forum_m, only: RD
 
    use constants_m
+   use evol_model_m
    use math_m
    use model_m
    use model_util_m
@@ -138,12 +139,22 @@ contains
       bg%alpha_Pt = ml%coeff(I_TDC_ALPHA_PT, pt)
       bg%Pturb0 = ml%coeff(I_TDC_MLT_PTURB0, pt)
 
+      ! Retain the regular central powers of radius, mass and luminosity.
+
+      select type (ml)
+      type is (evol_model_t)
+         bg%r = ml%R_star*pt%x
+         bg%m_r = ml%M_r(pt)
+         bg%L_r = ml%L_star*ml%coeff(I_C_LUM, pt)*pt%x**3
+         bg%L_conv0 = ml%L_star*ml%coeff(I_TDC_C_CONV, pt)*pt%x**3
+      end select
+
       if (bg%Peos > 0._RD) bg%beta_turb = bg%Pturb0/bg%Peos
       if (bg%Pturb0 > tiny) bg%dln_Pturb0 = ml%dcoeff(I_TDC_MLT_PTURB0, pt)
 
       bg%Y = bg%nabla_T - bg%nabla_L
 
-      if (.NOT. bg%active) then
+      if (.NOT. bg%active .OR. pt%x == 0._RD) then
          return
       end if
 

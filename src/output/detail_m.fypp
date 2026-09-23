@@ -262,6 +262,11 @@ contains
             ('lag_L', 'wv%lag_L(j)'), &
             ('dE_dx', 'wv%dE_dx(j)'), &
             ('dW_dx', 'wv%dW_dx(j)'), &
+            ('dP_visc_dx', 'wv%dP_visc_dx(j)'), &
+            ('P_visc_cum', 'wv%P_visc(j)'), &
+            ('P_visc_force_cum', 'wv%P_visc_force(j)'), &
+            ('P_visc_bound_cum', 'wv%P_visc_bound(j)'), &
+            ('P_visc_residual_cum', 'wv%P_visc_residual(j)'), &
             ('dW_eps_dx', 'wv%dW_eps_dx(j)'), &
             ('dQ_dx', 'wv%dQ_dx(j)'), &
             ('dzeta_dx', 'wv%dzeta_dx(j)'), &
@@ -304,6 +309,10 @@ contains
             ('E_ratio', 'wv%E_ratio()'), &
             ('H', 'wv%H()'), &
             ('W', 'wv%W()'), &
+            ('P_visc', 'wv%P_visc()'), &
+            ('P_visc_force', 'wv%P_visc_force()'), &
+            ('P_visc_bound', 'wv%P_visc_bound()'), &
+            ('P_visc_residual', 'wv%P_visc_residual()'), &
             ('W_eps', 'wv%W_eps()'), &
             ('Q', 'wv%Q()'), &
             ('tau_ss', 'wv%tau_ss()'), &
