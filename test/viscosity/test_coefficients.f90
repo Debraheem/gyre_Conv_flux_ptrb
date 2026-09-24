@@ -6,6 +6,9 @@ program test_coefficients
    use gyre_nad_diff_eqns_m
    use magnus_gl2_block_m
    use diff_eqns_m
+   use tdc_turb_m
+   use constants_m, only: G_GRAVITY
+   use math_m, only: PI
 
    implicit none (type, external)
 
@@ -165,7 +168,109 @@ program test_coefficients
    end do
    print *, 'PASS: small positive viscosity limit'
 
+   call check_tdc_energy()
+
 contains
+
+   subroutine check_tdc_energy()
+
+      type(tdc_turb_bg_t) :: bg, bg0
+      real(RD) :: gamma, c1, nad, nab, lum, rad, kt, kr, p, dyn_freq
+      complex(RD) :: iw, s, h, rho_y(6), q2(6), qS(6), q1(6)
+      complex(RD) :: row(6), pressure(6), heat(6), exact(6)
+      complex(RD) :: thermal(6,6), a(6,6), at(6,6)
+      integer :: ip
+
+      pt = gr%pt(k)
+      x = pt%x
+      call eval_tdc_turb_bg(ml, pt, 'BACKGROUND_RATIO', bg0)
+      dyn_freq = sqrt(G_GRAVITY*model%M_star/model%R_star**3)
+      c = 4._RD*PI*bg0%rho*model%R_star**3*dyn_freq/model%L_star
+      if (abs(bg0%c_etrb/c-1._RD) > 1.e-13_RD) error stop 'turbulent storage normalization'
+      V = ml%coeff(I_V_2, pt)*x*x
+      gamma = ml%coeff(I_GAMMA_1, pt)
+      ups_T = ml%coeff(I_UPS_T, pt)
+      c1 = ml%coeff(I_C_1, pt)
+      nad = ml%coeff(I_NABLA_AD, pt)
+      nab = ml%coeff(I_NABLA, pt)
+      lum = ml%coeff(I_C_LUM, pt)
+      rad = ml%coeff(I_C_RAD, pt)
+      kt = ml%coeff(I_KAP_T, pt)
+      kr = ml%coeff(I_KAP_RHO, pt)
+
+      ! With no perturbed source or cooling, compression fixes delta A analytically.
+
+      bg = bg0
+      bg%S0 = 0._RD
+      bg%DR0 = 0._RD
+      bg%L_conv0 = 0._RD
+      bg%Y_env = 0._RD
+      bg%alpha_Pt = 1._RD
+      bg%beta_turb = 0.1_RD
+      bg%Pturb0 = bg%beta_turb*bg%Peos
+      bg%dln_Pturb0 = -2._RD
+      do l = 0, 3
+         p = x**(l-2)
+         q1 = 0._RD
+         q1(1) = p
+         q2 = 0._RD
+         q2(1:2) = [-p*V,p*V]
+         qS = 0._RD
+         qS(5) = p
+         do i_w = 1, size(omega)
+            iw = (0._RD,1._RD)*omega(i_w)
+            s = -iw*sqrt(G_GRAVITY*bg%m_r*c1/bg%r**3)
+            h = -s*bg%A0*bg%alpha_Pt*(2._RD/3._RD)/(-2._RD*bg%A0*bg%D0-2._RD*s)
+            do ip = 0, 1
+               call eval_tdc_turb_row_gyre(bg, x, l, V, c1, gamma, ups_T, nad, nab, &
+                  lum, rad, kt, kr, iw, (1._RD,0._RD), ip == 1, row, pressure, heat)
+               rho_y = q2/gamma-ups_T*qS
+               if (ip == 1) rho_y = (q2+bg%beta_turb*bg%dln_Pturb0*q1-gamma*ups_T*qS) &
+                  /(gamma+bg%beta_turb*(1._RD+2._RD*h/bg%A0))
+               exact = iw*bg%c_etrb*2._RD*bg%A0*h*rho_y/p
+               if (maxval(abs(heat-exact)) > 1.e-12_RD*maxval(abs(exact))) &
+                  error stop 'analytic turbulent storage response'
+            end do
+         end do
+      end do
+      bg%active = .false.
+      call eval_tdc_turb_row_gyre(bg, x, l, V, c1, gamma, ups_T, nad, nab, &
+         lum, rad, kt, kr, iw, (1._RD,0._RD), .true., row, pressure, heat)
+      if (any(heat /= 0._RD)) error stop 'inactive turbulent storage'
+      print *, 'PASS: turbulent storage sign and scaling for 2x2 and 3x3 closures, l=0..3'
+
+      os_p%conv_scheme = 'PERTURBED_TDC_LOCAL'
+      os_p%tdc_alpha_M = 0._RD
+      do l = 0, 3
+         md_p%l = l
+         do i_w = 1, size(omega)
+            st = state_ct(omega(i_w))
+            iw = (0._RD,1._RD)*st%omega
+            os_p%alpha_thm = 1._RD
+            context = context_t(ml, gr, md_p, os_p, rt_p)
+            cx => context
+            de = gyre_nad_diff_eqns_t(cx, pt, os_p)
+            call de%eval(st, x, thermal)
+            call de%eval(st, x, at, trans=.true.)
+            if (maxval(abs(at-transpose(thermal))) > 1.e-13_RD*maxval(abs(thermal))) &
+               error stop 'thermal matrix transpose'
+            os_p%alpha_thm = 0._RD
+            context = context_t(ml, gr, md_p, os_p, rt_p)
+            de = gyre_nad_diff_eqns_t(cx, pt, os_p)
+            call de%eval(st, x, a)
+            thermal = thermal-a
+            call eval_tdc_turb_row_gyre(bg0, x, l, V, c1, gamma, ups_T, nad, nab, &
+               lum, rad, kt, kr, iw, (1._RD,0._RD), .false., row, pressure, heat)
+            exact = heat
+            exact(5) = exact(5)+iw*ml%coeff(I_C_THK, pt)
+            if (maxval(abs(thermal(6,:)-exact)) > 1.e-11_RD*maxval(abs(exact))) &
+               error stop 'thermal matrix storage row'
+            if (maxval(abs(thermal(:5,:))) /= 0._RD) error stop 'thermal matrix other rows'
+         end do
+      end do
+      print *, 'PASS: thermal storage matrix row, transpose and alpha_thm scaling'
+
+   end subroutine check_tdc_energy
 
    subroutine diff_eqns_factory(pt, de)
 

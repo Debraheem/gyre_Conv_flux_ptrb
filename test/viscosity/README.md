@@ -37,6 +37,13 @@ using `tdc_alpha_M=1d-12`, without a coefficient floor.
 The supplied profile must contain an inviscid interval and a viscous
 test point.
 
+The coefficient test also checks turbulent energy storage in the local
+TDC heat equation. An analytic compression response tests its sign and
+normalization in the 2x2 and 3x3 closures for degrees 0 through 3 at
+three complex frequencies. Further checks cover inactive convection,
+the sixth matrix row, transposed evaluation and `alpha_thm` scaling.
+The synthetic 3x3 check does not validate turbulent-pressure equilibrium.
+
 For nonradial Magnus, the differential rows use exponential propagation;
 the horizontal reconstruction and implicit shear relation remain second
 order. Invoking MAGNUS_GL2 does not enable a nodal eight-variable

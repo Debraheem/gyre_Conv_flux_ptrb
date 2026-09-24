@@ -287,7 +287,49 @@ The change in :math:`\delta\rho/(p\rho)` is :math:`(V/\Gamma_1)d`.
 The radial momentum row therefore receives :math:`-(V/\Gamma_1)d`.
 Both normal and transposed matrix evaluations use this coefficient.
 
-The local linearization holds :math:`c_P`, :math:`H_P`,
+Turbulent Energy Storage
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+The local TDC scheme includes the specific turbulent energy perturbation
+:math:`\delta e_t=2A_0\delta A` in the thermal equation. On a static
+background the storage term is :math:`s(T\delta S+\delta e_t)`, with
+:math:`s=-\mathrm{i}\sigma`. The local closure supplies :math:`\delta A`
+for both the two-by-two and three-by-three systems.
+
+Define :math:`\omega_{\rm dyn}=\sqrt{GM_\star/R_\star^3}`,
+:math:`p=x^{\ell-2}`, and :math:`\delta A=\sum_j a_j y_j`. The addition
+to the sixth row of :math:`x\,dy/dx` is
+
+.. math::
+
+   \Delta A_{6j}=\alpha_{\rm thm}\,\mathrm{i}\omega_c
+   \frac{4\pi\rho R_\star^3\omega_{\rm dyn}}{L_\star}
+   \frac{2A_0 a_j}{p}.
+
+**Turbulent energy storage is always included with**
+``conv_scheme = 'PERTURBED_TDC_LOCAL'``.
+It uses the existing local velocity response and needs no additional
+profile columns or differential unknowns. The frequency convention is
+the same as for ordinary entropy storage. The existing
+:nml:option:`alpha_thm <osc.alpha_thm>` scales both terms. The viscous
+equations retain this row under their stress-variable transformation.
+Frozen-convection and adiabatic equations are unchanged.
+
+Matching MESA's thermal storage requires
+``TDC_include_eturb_in_energy_equation = .true.`` and
+``star_LNA_perturb_turbulent_energy = .true.``. The local velocity equation
+has its own storage term :math:`s\delta I_A`; eliminating that equation
+supplies :math:`\delta A` but does not replace the heat equation.
+
+Omitted Closure Responses
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**The following closure responses are not implemented.** They are needed
+to reproduce the corresponding MESA ``star_LNA`` linearization, rather
+than the fixed-coefficient approximation used here. No input control
+enables these missing terms.
+
+The implemented local linearization holds :math:`c_P`, :math:`H_P`,
 :math:`\nabla_{\rm L}`, :math:`\nabla_{\rm ad}`, and
 the reconstructed ratio :math:`Y_{\rm env}/Y` fixed at their profile values.
 It includes the exported opacity derivatives in the radiative and TDC damping
@@ -318,7 +360,10 @@ another first order perturbation and are discarded. Within the nonlinear
 convection closure, these coefficients multiply nonzero equilibrium factors,
 so their differentials contribute at first order.
 
-The current local TDC branch cannot be combined with
+Other Restrictions
+^^^^^^^^^^^^^^^^^^
+
+The local TDC branch cannot be combined with
 :nml:option:`alpha_trb <osc.alpha_trb>` or with inhomogeneous forcing. GYRE
 stops with an error for either combination.
 
@@ -330,10 +375,6 @@ coefficients or the outer pressure boundary condition using
 
 Eddy viscosity is selected separately through
 :nml:option:`tdc_alpha_M <osc.tdc_alpha_M>` and is described below.
-The local TDC equations omit the optional turbulent-energy storage term included by MESA when
-``TDC_include_eturb_in_energy_equation`` and
-``star_LNA_perturb_turbulent_energy`` are enabled. In the continuous limit,
-:math:`e_{\rm turb}=A^2` and :math:`\delta e_{\rm turb}=2A_0\delta A`.
 
 Harmonic mixing-length support is deferred. Current matched MESA comparisons
 require ``harmonic_dissipation_length_beta = 0`` and use

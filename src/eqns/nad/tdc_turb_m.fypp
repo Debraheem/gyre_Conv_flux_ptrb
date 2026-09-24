@@ -53,6 +53,7 @@ module tdc_turb_m
       real(RD) :: alpha_mlt = 0._RD
       real(RD) :: Lambda = 0._RD
       real(RD) :: c_P = 0._RD
+      real(RD) :: c_etrb = 0._RD
       real(RD) :: nabla_ad = 0._RD
       real(RD) :: nabla_L = 0._RD
       real(RD) :: nabla_T = 0._RD
@@ -147,6 +148,7 @@ contains
          bg%m_r = ml%M_r(pt)
          bg%L_r = ml%L_star*ml%coeff(I_C_LUM, pt)*pt%x**3
          bg%L_conv0 = ml%L_star*ml%coeff(I_TDC_C_CONV, pt)*pt%x**3
+         bg%c_etrb = 4._RD*PI*bg%rho*SQRT(G_GRAVITY*ml%M_star*ml%R_star**3)/ml%L_star
       end select
 
       if (bg%Peos > 0._RD) bg%beta_turb = bg%Pturb0/bg%Peos
@@ -201,7 +203,7 @@ contains
 
    subroutine eval_tdc_turb_row_gyre(bg, x, l, V, c_1, Gamma_1, ups_T, nabla_ad, &
          nabla, c_lum, c_rad, kap_T, kap_rho, i_omega_c, f_rht, &
-         perturb_mlt_Pturb, row_delta, y2eos_delta)
+         perturb_mlt_Pturb, row_delta, y2eos_delta, heat_delta)
 
       type(tdc_turb_bg_t), intent(in) :: bg
       real(RD), intent(in)            :: x
@@ -221,6 +223,7 @@ contains
       logical, intent(in)             :: perturb_mlt_Pturb
       complex(RD), intent(out)        :: row_delta(6)
       complex(RD), intent(out)        :: y2eos_delta(6)
+      complex(RD), optional, intent(out) :: heat_delta(6)
 
       real(RD), parameter :: x_ALFAP = 2._RD/3._RD
       real(RD), parameter :: tiny = 10._RD*EPSILON(1._RD)
@@ -245,6 +248,7 @@ contains
       complex(RD) :: q6_y(6)
       complex(RD) :: q5_rad_y(6)
       complex(RD) :: q5_tdc_y(6)
+      complex(RD) :: q7_y(6)
       complex(RD) :: A2(2,2)
       complex(RD) :: rhs2(2,6)
       complex(RD) :: sol2(2,6)
@@ -256,6 +260,7 @@ contains
 
       row_delta = 0._RD
       y2eos_delta = 0._RD
+      if (PRESENT(heat_delta)) heat_delta = 0._RD
 
       if (.NOT. bg%active) then
          return
@@ -390,6 +395,7 @@ contains
 
          q2eos_y = sol3(1,:)
          q5_tdc_y = sol3(2,:)
+         q7_y = sol3(3,:)
 
          y2eos_delta = (q2eos_y - q2tot_y)/(p*V)
 
@@ -408,10 +414,15 @@ contains
          call solve_local_2x2_(A2, rhs2, sol2)
 
          q5_tdc_y = sol2(1,:)
+         q7_y = sol2(2,:)
 
       end if
 
       row_delta = V/(f_rht*p)*(q5_rad_y - q5_tdc_y)
+
+      ! x*d(y6)/dx includes i*omega*c_etrb*delta(A**2)/x**(l-2).
+
+      if (PRESENT(heat_delta)) heat_delta = i_omega_c*bg%c_etrb*2._RD*bg%A0*q7_y/p
 
       ! Finish
 
