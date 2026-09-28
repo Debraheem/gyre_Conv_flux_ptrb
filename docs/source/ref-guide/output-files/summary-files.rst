@@ -285,6 +285,42 @@ Energetics & Transport
 
    Mode work :math:`W \equiv \int \sderiv{W}{x} \, \diff{x}`\ [#only-N]_
 
+.. ofile:field:: P_visc
+   :type: real
+   :dim: :ofile:field:`n_row`
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Negative phase-averaged viscous volume dissipation, with
+   :math:`t_{\rm dyn}=(\Rstar^3/G\Mstar)^{1/2}`. Scales with squared
+   mode amplitude. Excludes boundary power and is zero when
+   :nml:option:`tdc_alpha_M <osc.tdc_alpha_M>` is zero.
+
+.. ofile:field:: P_visc_force
+   :type: real
+   :dim: :ofile:field:`n_row`
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Phase-averaged viscous force work
+   :math:`\frac12\Re\int\rho\,\mathbf v^*\cdot\mathbf a_\nu\,\diff V`,
+   evaluated from the native stresses. Scales with squared mode amplitude.
+
+.. ofile:field:: P_visc_bound
+   :type: real
+   :dim: :ofile:field:`n_row`
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Phase-averaged viscous boundary work, summed over the inner and outer
+   face of each segment. Includes both sides of internal interfaces.
+
+.. ofile:field:: P_visc_residual
+   :type: real
+   :dim: :ofile:field:`n_row`
+   :units: :math:`G\Mstar^2/(\Rstar t_{\rm dyn})`
+
+   Signed balance residual ``P_visc_force - P_visc_bound - P_visc``.
+   This is a spatial-discretization diagnostic, not a growth rate.
+   All viscous power fields vanish when viscosity is disabled.
+
 .. ofile:field:: W_eps
    :type: real
    :dim: :ofile:field:`n_row`

@@ -82,7 +82,7 @@ contains
 
    #:for T, S in zip(DTYPE_BASE_TYPES, DTYPE_SUFFIXES)
 
-      function bvp_${S}$_(gr, bc_i, bc_o, diff_eqns_factory, match_conds_factory, nm_p) result(bp)
+      function bvp_${S}$_(gr, bc_i, bc_o, diff_eqns_factory, match_conds_factory, nm_p, block_factory) result(bp)
 
          type(grid_t), intent(in)             :: gr
          class(bound_conds_${S}$), intent(in) :: bc_i
@@ -102,7 +102,14 @@ contains
                type(point_t), intent(in)                          :: pt(:)
                class(match_conds_${S}$), allocatable, intent(out) :: mc(:)
             end subroutine match_conds_factory
+            subroutine block_factory(j, ib)
+               use inter_block_m
+               implicit none (type, external)
+               integer, intent(in) :: j
+               class(inter_block_${S}$), allocatable, intent(out) :: ib
+            end subroutine block_factory
          end interface
+         optional :: block_factory
          type(num_par_t), intent(in) :: nm_p
          type(bvp_${S}$)             :: bp
 
@@ -138,7 +145,9 @@ contains
                pt_a => gr%pt(j), &
                pt_b => gr%pt(j+1))
 
-               if (pt_a%s == pt_b%s) then
+               if (PRESENT(block_factory)) then
+                  call block_factory(j, bp%ie(j)%ib)
+               else if (pt_a%s == pt_b%s) then
                   #:if defined('GFORTRAN_PR110877')
                      allocate(bp%ie(j)%ib, SOURCE=diff_block_${S}$(diff_eqns_factory, pt_a, pt_b, nm_p))
                   #:else

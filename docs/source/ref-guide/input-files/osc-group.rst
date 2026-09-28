@@ -131,6 +131,13 @@ available:
    Scaling factor for horizontal flux perturbations (see the :math:`\alphahfl`
    entry in the :ref:`osc-physics-switches` section)
 
+.. nml:option:: alpha_hfc
+   :type: real
+   :default: 0
+
+   Scaling factor for horizontal convective heat-flux perturbations (see the
+   :math:`\alphahfc` entry in the :ref:`osc-physics-switches` section)
+
 .. nml:option:: alpha_gam
    :type: real
    :default: 1
@@ -209,6 +216,86 @@ available:
      case 1 described by :ads_citet:`pesnell:1990`
    - :nml:value:`'FROZEN_PESNELL_4'` : Freeze Lagrangian perturbation of convective luminosity;
      case 4 described by :ads_citet:`pesnell:1990`
+   - :nml:value:`'PERTURBED_TDC_LOCAL'` : Evaluate the local TDC luminosity and
+     velocity equations from a version-1.30 MESA-format model. The local
+     algebraic system determines :math:`\delta\nabla` and :math:`\delta A` and
+     replaces the radiative thermal-gradient closure. Set
+     :nml:option:`alpha_hfc <osc.alpha_hfc>` to 1 to include the horizontal
+     convective heat-flux term for nonradial modes. Set
+     :nml:option:`tdc_include_Pturb <osc.tdc_include_Pturb>` to
+     :nml:value:`.TRUE.` to include the local MLT turbulent-pressure
+     perturbation. This scheme requires :nml:option:`variables_set
+     <osc.variables_set>` = :nml:value:`'GYRE'` and does not support
+     :nml:option:`alpha_trb <osc.alpha_trb>` > 0 or inhomogeneous forcing.
+
+.. nml:option:: tdc_yenv_scheme
+   :type: string
+   :default: 'BACKGROUND_RATIO'
+
+   Scheme for reconstructing the effective TDC superadiabaticity
+   :math:`Y_{\rm env}` from a schema-130 MESA profile; one of
+
+   - :nml:value:`'BACKGROUND_RATIO'` : Infer :math:`Y_{\rm env}` from the
+     exported background convective luminosity.
+   - :nml:value:`'NONE'` : Use :math:`Y_{\rm env}=Y`.
+
+.. nml:option:: tdc_include_Pturb
+   :type: logical
+   :default: .FALSE.
+
+   Include the local perturbation of MESA MLT turbulent pressure in the
+   :nml:value:`'PERTURBED_TDC_LOCAL'` convection branch. The equilibrium
+   pressure is read from the version-1.30 ``tdc_mlt_Pturb0`` model
+   coefficient, whose normalization is set by MESA's ``mlt_Pturb_factor``.
+   When this option is :nml:value:`.TRUE.` and
+   ``tdc_mlt_Pturb0`` is nonzero at a mesh point, the local TDC closure uses a
+   three-by-three solve for the EOS-pressure perturbation,
+   :math:`\delta\nabla`, and :math:`\delta A`. Otherwise it uses the default
+   two-by-two solve for :math:`\delta\nabla` and :math:`\delta A`.
+
+   This option applies to radial and nonradial modes. The local pressure
+   split includes the Eulerian conversion of the turbulent-pressure
+   perturbation. The background mechanical coefficients and pressure
+   boundary retain the standard GYRE expressions. See
+   :ref:`osc-conv` for the equations and restrictions.
+
+.. nml:option:: tdc_alpha_M
+   :type: real
+   :default: 0.
+
+   Kuhfuss eddy-viscosity coefficient for nonadiabatic modes.
+   Zero disables viscosity. A value of -1 uses ``tdc_alpha_M`` from
+   the loaded version-1.30 MESA profile. A positive value overrides
+   the profile coefficient; for example, ``tdc_alpha_M = 0.25d0``.
+   Other negative values are invalid. The viscosity is zero wherever
+   the exported convective velocity is zero.
+
+   Both radial and nonradial forces are included. This option is
+   independent of :nml:option:`conv_scheme`: it can be used with frozen
+   convection or the local TDC heat-flux closure. It does not enable
+   turbulent pressure or turbulent-energy transport.
+
+   The active viscous problem requires a nonrotating model with
+   ``variables_set = 'GYRE'``, ``lambda_method = 'SPH'``,
+   ``alpha_gam = alpha_pi = 1``, and ``alpha_trb = 0``.
+   Set ``diff_scheme = 'COLLOC_GL2'`` or ``'MAGNUS_GL2'`` in ``&num``; ``BANDED``,
+   ``ROWPP``, and ``CYCLIC`` matrix solvers are supported.
+   For nonradial modes, Magnus propagation retains the implicit staggered
+   shear relation and midpoint horizontal reconstruction. Both methods
+   are second order. Higher order discretizations are not implemented
+   for active viscosity.
+   Both time conventions and nonzero ``alpha_rht`` are allowed.
+   Use ``ZERO_R`` at a finite inner radius, or ``REGULAR`` at a center.
+   A positive-viscosity first interval uses regular scalar and vector
+   expansions with midpoint collocation. It requires a regular equilibrium
+   and a resolved central interval. The central viscosity must be finite
+   and positive, or the first interval must be inviscid. A coefficient
+   vanishing only at the origin is not supported. A viscous outer
+   surface requires ``outer_bound = 'VACUUM'`` or ``'ZERO_R'``.
+   Atmospheric conditions can be retained when the surface viscosity
+   is zero. Multiple grid segments are supported, with traction matching
+   at their interfaces. Inhomogeneous forcing is not supported by this option.
+   See :ref:`osc-conv-visc` for the equations.
 
 .. nml:option:: deps_scheme
    :type: string
